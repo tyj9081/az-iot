@@ -135,7 +135,7 @@ fn build_cip_read_tag(session: u32, conn_id: u32, tag: &[u8], count: u16) -> Vec
     frame
 }
 
-fn parse_cip_data(buf: &[u8], dtype: &str) -> Option<f64> {
+fn parse_cip_data(buf: &[u8], _dtype: &str) -> Option<f64> {
     if buf.len() < 30 { return None; }
     let data_start = 26;
     let data = &buf[data_start..];
