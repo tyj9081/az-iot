@@ -1,0 +1,21 @@
+CREATE TABLE dev_register_map (
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    model_id           BIGINT       NOT NULL,
+    sensor_code        VARCHAR(64)  NOT NULL,
+    sensor_name        VARCHAR(128) NOT NULL,
+    register_address   INT          NOT NULL,
+    register_count     INT          NOT NULL DEFAULT 1,
+    data_type          VARCHAR(16)  NOT NULL DEFAULT 'uint16' COMMENT 'uint16/int16/uint32/int32/float32/float64/string/bool',
+    byte_order         VARCHAR(8)   NOT NULL DEFAULT 'ABCD'  COMMENT 'ABCD/BADC/CDAB/DCBA',
+    func_code          VARCHAR(8)   NOT NULL DEFAULT '0x03',
+    coefficient        DECIMAL(12,6) NOT NULL DEFAULT 1.0,
+    offset_val         DECIMAL(12,6) NOT NULL DEFAULT 0.0,
+    unit               VARCHAR(16)  NOT NULL DEFAULT '',
+    rw                 VARCHAR(8)   NOT NULL DEFAULT 'R' COMMENT 'R/W/RW',
+    sort_order          INT          NOT NULL DEFAULT 0,
+    description        VARCHAR(256),
+    created_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_model_sensor (model_id, sensor_code),
+    CONSTRAINT fk_regmap_model FOREIGN KEY (model_id) REFERENCES dev_device_model(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
