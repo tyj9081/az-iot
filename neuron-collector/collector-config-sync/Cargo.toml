@@ -7,4 +7,7 @@ edition = "2021"
 collector-model = { path = "../collector-model" }
 collector-scheduler = { path = "../collector-scheduler" }
 tokio = { workspace = true }
+anyhow = { workspace = true }
 tracing = { workspace = true }
+serde_json = { workspace = true }
+rumqttc = { workspace = true }

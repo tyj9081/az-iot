@@ -2,8 +2,9 @@
 //! Real I/O over serial port (RTU) or TCP socket (TCP).
 
 use anyhow::{Context, Result};
-use collector_model::{BusType, DataPoint, Device};
+use collector_model::{BusType, Device};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::time::Duration;
 use tokio_modbus::prelude::*;
 
@@ -15,7 +16,6 @@ async fn mb_collect_async(
     device: &Device,
 ) -> Result<HashMap<String, f64>> {
     let mut values = HashMap::new();
-    let slave = Slave(device.slave_addr);
 
     for pt in &device.data_points {
         let fc: u8 = pt.func_code.parse().unwrap_or(3);
@@ -24,17 +24,20 @@ async fn mb_collect_async(
 
         let raw: Vec<u16> = match fc {
             1 | 2 => {
-                let coils = ctx.read_coils(slave, addr, count).await
-                    .with_context(|| format!("Read coils at {addr}"))?;
-                coils.iter().map(|&b| b as u16).collect()
+                let coils = ctx.read_coils(addr, count).await
+                    .with_context(|| format!("Read coils at {addr}"))?
+                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default();
+                coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
             }
             3 | 4 => {
-                ctx.read_holding_registers(slave, addr, count).await
+                ctx.read_holding_registers(addr, count).await
                     .with_context(|| format!("Read registers at {addr}"))?
+                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default()
             }
             _ => {
-                ctx.read_holding_registers(slave, addr, count).await
+                ctx.read_holding_registers(addr, count).await
                     .with_context(|| format!("Read registers at {addr}"))?
+                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default()
             }
         };
 
@@ -124,9 +127,9 @@ impl ProtocolDriver for ModbusRTUDriver {
                 .timeout(Duration::from_secs(3));
             let port = builder.open_native()
                 .with_context(|| format!("Open serial port {port_name}"))?;
-            let mut ctx = tokio_modbus::client::rtu::connect_slave(port, Slave(device.slave_addr))
+            let mut ctx = tokio_modbus::client::rtu::connect(port)
                 .context("ModbusRTU connect")?;
-            ctx.set_timeout(Duration::from_secs(3));
+            ctx.set_slave(Slave(device.slave_addr));
             mb_collect_async(&mut ctx, device).await
         })
     }
@@ -144,16 +147,17 @@ impl ProtocolDriver for ModbusTCPDriver {
     fn protocol_name(&self) -> &str { "Modbus TCP" }
 
     fn collect(&self, device: &Device) -> Result<HashMap<String, f64>> {
-        let addr = match &device.bus {
-            BusType::Tcp { host, port } => format!("{host}:{port}"),
+        let socket_addr: SocketAddr = match &device.bus {
+            BusType::Tcp { host, port } => format!("{host}:{port}").parse()
+                .context("Invalid ModbusTCP address")?,
             _ => anyhow::bail!("ModbusTCP requires TCP bus"),
         };
 
         let handle = tokio::runtime::Handle::current();
         handle.block_on(async {
-            let mut ctx = tokio_modbus::client::tcp::connect(&addr).await
+            let mut ctx = tokio_modbus::client::tcp::connect(socket_addr).await
                 .context("ModbusTCP connect")?;
-            ctx.set_timeout(Duration::from_secs(3));
+            ctx.set_slave(Slave(device.slave_addr));
             mb_collect_async(&mut ctx, device).await
         })
     }

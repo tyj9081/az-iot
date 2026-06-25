@@ -18,7 +18,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tokio-serial = "5"
 tokio-modbus = "0.13"
-rumqttc = "0.24"
+rumqttc = { version = "0.24", default-features = false, features=["use-native-tls"] }
 anyhow = "1"
 thiserror = "1"
 tracing = "0.1"
@@ -29,3 +29,4 @@ hex = "0.4"
 crc = "3"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
+sysinfo = "0.31"

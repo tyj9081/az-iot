@@ -12,9 +12,15 @@ collector-model = { path = "../collector-model" }
 collector-scheduler = { path = "../collector-scheduler" }
 collector-reporter = { path = "../collector-reporter" }
 collector-uploader = { path = "../collector-uploader" }
+collector-config-sync = { path = "../collector-config-sync" }
+collector-storage = { path = "../collector-storage" }
+collector-telemetry = { path = "../collector-telemetry" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 toml = "0.8"
+rumqttc = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

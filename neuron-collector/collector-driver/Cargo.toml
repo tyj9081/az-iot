@@ -16,6 +16,9 @@ hex = { workspace = true }
 crc = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rumqttc = { workspace = true }
 collector-model = { path = "../collector-model" }
 serde = { workspace = true }
 serde_json = { workspace = true }

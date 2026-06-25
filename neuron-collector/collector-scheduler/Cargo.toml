@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 collector-model = { path = "../collector-model" }
 collector-uploader = { path = "../collector-uploader" }
+collector-driver = { path = "../collector-driver" }
+collector-reporter = { path = "../collector-reporter" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
