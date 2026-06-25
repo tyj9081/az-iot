@@ -19,6 +19,7 @@ public class SysUser {
 
     private String username;
 
+    @TableField("password")
     private String passwordHash;
 
     private String nickname;
