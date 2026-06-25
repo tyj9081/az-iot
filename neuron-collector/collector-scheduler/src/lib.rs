@@ -1,4 +1,5 @@
-use collector_model::Device;
+use collector_model::{Device, LatestReading};
+use collector_uploader::Uploader;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -18,10 +19,7 @@ impl DeviceRegistry {
 
     pub fn register(&mut self, device: Device) {
         let bus_key = self.bus_key(&device);
-        self.bus_groups
-            .entry(bus_key)
-            .or_default()
-            .push(device.id);
+        self.bus_groups.entry(bus_key).or_default().push(device.id);
         self.devices.insert(device.id, device);
     }
 
@@ -39,16 +37,43 @@ impl DeviceRegistry {
 
 pub type SharedRegistry = Arc<RwLock<DeviceRegistry>>;
 
+#[derive(Clone)]
 pub struct Collector {
     pub registry: SharedRegistry,
+    pub uploader: Arc<Uploader>,
 }
 
 impl Collector {
-    pub fn new(registry: SharedRegistry) -> Self { Self { registry } }
+    pub fn new(registry: SharedRegistry, uploader: Arc<Uploader>) -> Self {
+        Self { registry, uploader }
+    }
 
+    /// 主循环：轮询采集设备并上报
     pub async fn run(&self) -> anyhow::Result<()> {
-        tracing::info!("Scheduler running with {} devices", self.registry.read().await.devices.len());
-        Ok(())
+        let device_count = self.registry.read().await.devices.len();
+        tracing::info!(
+            "Scheduler running with {} devices, channel: {}",
+            device_count,
+            self.uploader.active_channel().await
+        );
+
+        // 主循环：每秒轮询一次（Phase 2 会改成按设备采集间隔调度）
+        loop {
+            let registry = self.registry.read().await;
+            for (id, _device) in registry.devices.iter() {
+                // 模拟采集读数 (Phase 2: 调用 driver.collect())
+                let reading = LatestReading {
+                    device_id: *id,
+                    sensor_code: "demo".into(),
+                    value: rand::random::<f64>() * 100.0,
+                    unit: "units".into(),
+                    read_at: chrono::Utc::now().to_rfc3339(),
+                };
+                self.uploader.publish(&reading).await;
+            }
+            drop(registry);
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
     }
 }
 
@@ -77,6 +102,7 @@ mod tests {
             },
             collect_interval_sec: None,
             data_points: vec![],
+            alarm_config: None,
         };
         reg.register(device);
         assert!(reg.get(1).is_some());
