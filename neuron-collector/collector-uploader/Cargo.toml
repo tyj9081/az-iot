@@ -1,0 +1,18 @@
+[package]
+name = "collector-uploader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+collector-model = { path = "../collector-model" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rumqttc = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+url = "2"
+chrono = { workspace = true }
+reqwest = { workspace = true }
