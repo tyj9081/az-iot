@@ -1,6 +1,7 @@
 # API 清单
 
-> AZ-IOT 全部 API 端点 | 统一前缀: /api/v1
+> AZ-IOT 全部 API 端点 | 统一前缀: /api/v1  
+> 协议支持: 18 种工业协议 (见 `common.enums.ProtocolType`) | 两端枚举 code 严格对齐
 
 ---
 
