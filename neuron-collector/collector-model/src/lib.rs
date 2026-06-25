@@ -150,6 +150,17 @@ pub struct DataPoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceAlarmThreshold {
+    pub sensor_code: String,
+    pub enabled: bool,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub hysteresis: f64,
+    pub delay_count: u32,
+    pub level: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
     pub id: i64,
     pub code: String,
@@ -159,6 +170,7 @@ pub struct Device {
     pub bus: BusType,
     pub collect_interval_sec: Option<u64>,
     pub data_points: Vec<DataPoint>,
+    pub alarm_config: Option<Vec<DeviceAlarmThreshold>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

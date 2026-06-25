@@ -1,4 +1,4 @@
-use collector_model::{LatestReading, AggregatedReading};
+use collector_model::{LatestReading, AggregatedReading, DeviceAlarmThreshold};
 use std::collections::HashMap;
 
 /// Channel A: real-time latest value (fire and forget)
@@ -59,28 +59,39 @@ impl Aggregator {
 
 /// Edge alarm engine
 pub struct AlarmEngine {
-    thresholds: HashMap<String, (f64, f64)>, // sensor_code → (min, max)
+    thresholds: HashMap<String, Vec<DeviceAlarmThreshold>>,
 }
 
 impl AlarmEngine {
-    pub fn new() -> Self { Self { thresholds: HashMap::new() } }
-
-    pub fn set_threshold(&mut self, sensor_code: &str, min: f64, max: f64) {
-        self.thresholds.insert(sensor_code.to_string(), (min, max));
+    pub fn new() -> Self {
+        Self { thresholds: HashMap::new() }
     }
 
-    pub fn check(&self, readings: &HashMap<String, f64>) -> Vec<String> {
+    pub fn load_from_device(&mut self, device_id: i64, configs: &[DeviceAlarmThreshold]) {
+        let key = format!("{}_{}", device_id, "alarms");
+        self.thresholds.insert(key, configs.to_vec());
+    }
+
+    pub fn check(&self, device_id: i64, sensor_code: &str, value: f64) -> Option<Vec<String>> {
+        let key = format!("{}_{}", device_id, "alarms");
+        let configs = self.thresholds.get(&key)?;
         let mut alarms = Vec::new();
-        for (code, value) in readings {
-            if let Some((min, max)) = self.thresholds.get(code) {
-                if *value < *min {
-                    alarms.push(format!("{} LOW: {:.2} < {:.2}", code, value, min));
-                } else if *value > *max {
-                    alarms.push(format!("{} HIGH: {:.2} > {:.2}", code, value, max));
+        for cfg in configs {
+            if cfg.sensor_code != sensor_code || !cfg.enabled {
+                continue;
+            }
+            if let Some(min) = cfg.min {
+                if value < min - cfg.hysteresis {
+                    alarms.push(format!("{}_LOW: {:.3}<{:.3}", sensor_code, value, min));
+                }
+            }
+            if let Some(max) = cfg.max {
+                if value > max + cfg.hysteresis {
+                    alarms.push(format!("{}_HIGH: {:.3}>{:.3}", sensor_code, value, max));
                 }
             }
         }
-        alarms
+        if alarms.is_empty() { None } else { Some(alarms) }
     }
 }
 
@@ -112,29 +123,57 @@ mod tests {
     #[test]
     fn test_alarm_engine_low() {
         let mut engine = AlarmEngine::new();
-        engine.set_threshold("voltage", 200.0, 240.0);
-        let readings: HashMap<String, f64> = [("voltage".into(), 190.0)].into();
-        let alarms = engine.check(&readings);
-        assert!(!alarms.is_empty());
-        assert!(alarms[0].contains("LOW"));
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "voltage".into(),
+            enabled: true,
+            min: Some(200.0),
+            max: Some(240.0),
+            hysteresis: 0.0,
+            delay_count: 1,
+            level: "warning".into(),
+        }];
+        engine.load_from_device(1, &configs);
+        let alarms = engine.check(1, "voltage", 190.0);
+        assert!(alarms.is_some());
+        let alarm_list = alarms.unwrap();
+        assert!(!alarm_list.is_empty());
+        assert!(alarm_list[0].contains("LOW"));
     }
 
     #[test]
     fn test_alarm_engine_high() {
         let mut engine = AlarmEngine::new();
-        engine.set_threshold("voltage", 200.0, 240.0);
-        let readings: HashMap<String, f64> = [("voltage".into(), 250.0)].into();
-        let alarms = engine.check(&readings);
-        assert!(!alarms.is_empty());
-        assert!(alarms[0].contains("HIGH"));
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "voltage".into(),
+            enabled: true,
+            min: Some(200.0),
+            max: Some(240.0),
+            hysteresis: 0.0,
+            delay_count: 1,
+            level: "warning".into(),
+        }];
+        engine.load_from_device(1, &configs);
+        let alarms = engine.check(1, "voltage", 250.0);
+        assert!(alarms.is_some());
+        let alarm_list = alarms.unwrap();
+        assert!(!alarm_list.is_empty());
+        assert!(alarm_list[0].contains("HIGH"));
     }
 
     #[test]
     fn test_alarm_engine_ok() {
         let mut engine = AlarmEngine::new();
-        engine.set_threshold("voltage", 200.0, 240.0);
-        let readings: HashMap<String, f64> = [("voltage".into(), 220.0)].into();
-        let alarms = engine.check(&readings);
-        assert!(alarms.is_empty());
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "voltage".into(),
+            enabled: true,
+            min: Some(200.0),
+            max: Some(240.0),
+            hysteresis: 0.0,
+            delay_count: 1,
+            level: "warning".into(),
+        }];
+        engine.load_from_device(1, &configs);
+        let alarms = engine.check(1, "voltage", 220.0);
+        assert!(alarms.is_none());
     }
 }

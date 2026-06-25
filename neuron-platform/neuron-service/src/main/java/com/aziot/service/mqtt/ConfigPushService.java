@@ -23,6 +23,7 @@ public class ConfigPushService {
     private final DevCollectorMapper collectorMapper;
     private final DevDeviceModelMapper modelMapper;
     private final DevRegisterMapMapper registerMapMapper;
+    private final DevDeviceAlarmConfigMapper alarmConfigMapper;
     private final ObjectMapper objectMapper;
 
     public void pushDelta(Long deviceId, String action) {
@@ -72,6 +73,27 @@ public class ConfigPushService {
             }
             deviceNode.put("data_points", dps);
             deviceNode.put("collect_interval_sec", device.getCollectIntervalSec());
+
+            // 追加告警配置
+            List<DevDeviceAlarmConfig> alarms = alarmConfigMapper.selectList(
+                new LambdaQueryWrapper<DevDeviceAlarmConfig>()
+                    .eq(DevDeviceAlarmConfig::getDeviceId, device.getId())
+                    .eq(DevDeviceAlarmConfig::getAlarmEnabled, 1));
+
+            List<Map<String, Object>> alarmList = new ArrayList<>();
+            for (DevDeviceAlarmConfig ac : alarms) {
+                Map<String, Object> acm = new LinkedHashMap<>();
+                acm.put("sensor_code", ac.getSensorCode());
+                acm.put("enabled", true);
+                if (ac.getMinValue() != null) acm.put("min", ac.getMinValue());
+                if (ac.getMaxValue() != null) acm.put("max", ac.getMaxValue());
+                acm.put("hysteresis", ac.getHysteresis());
+                acm.put("delay_count", ac.getDelayCount());
+                acm.put("level", ac.getAlarmLevel());
+                alarmList.add(acm);
+            }
+            deviceNode.put("alarm_config", alarmList);
+
             payload.put("device", deviceNode);
 
             String json = objectMapper.writeValueAsString(payload);

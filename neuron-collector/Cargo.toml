@@ -28,6 +28,3 @@ hex = "0.4"
 crc = "3"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-libc = "0.2"

@@ -49,6 +49,32 @@
 
     <!-- 空状态 -->
     <el-empty v-if="!loading && readings.length === 0" description="暂无采集数据" />
+
+    <!-- 告警阈值设置 -->
+    <div class="alarm-section">
+      <h3 style="font-size:14px;font-weight:500;margin-bottom:12px;">告警阈值设置</h3>
+      <div class="alarm-grid">
+        <div v-for="item in readings" :key="'alarm-' + item.sensorCode" class="alarm-row">
+          <span class="alarm-sensor">{{ item.sensorName || item.sensorCode }}</span>
+          <span class="alarm-unit" v-if="item.unit">{{ item.unit }}</span>
+          <el-input-number v-model="alarmForm[item.sensorCode].minValue"
+            :disabled="alarmForm[item.sensorCode].alarmEnabled !== 1"
+            controls-position="right" size="small" placeholder="下限" style="width:130px"/>
+          <span style="color:#ccc;font-size:12px;">~</span>
+          <el-input-number v-model="alarmForm[item.sensorCode].maxValue"
+            :disabled="alarmForm[item.sensorCode].alarmEnabled !== 1"
+            controls-position="right" size="small" placeholder="上限" style="width:130px"/>
+          <el-switch v-model="alarmForm[item.sensorCode].alarmEnabled"
+            :active-value="1" :inactive-value="0" size="small"/>
+          <el-select v-model="alarmForm[item.sensorCode].alarmLevel" size="small" style="width:90px">
+            <el-option label="提示" value="info"/>
+            <el-option label="警告" value="warning"/>
+            <el-option label="严重" value="critical"/>
+          </el-select>
+          <el-button size="small" type="primary" @click="saveAlarm(item.sensorCode)">保存</el-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -58,6 +84,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { readingApi } from '@/api/reading'
 import { deviceApi } from '@/api/device'
+import { alarmConfigApi } from '@/api/alarm-config'
 
 const route = useRoute()
 const deviceId = Number(route.params.id)
@@ -104,6 +131,30 @@ function handleSwitch(item: any, val: boolean) {
   ElMessage.info(`写入 ${item.sensorCode} = ${val ? 1 : 0}（待对接 MQTT 写指令）`)
 }
 
+const alarmForm = ref<Record<string, any>>({})
+
+const loadAlarmConfig = async () => {
+  try {
+    const res = await alarmConfigApi.list(deviceId) as any
+    const configs = res?.data || []
+    const map: Record<string, any> = {}
+    readings.value.forEach((r: any) => {
+      const existing = configs.find((c: any) => c.sensorCode === r.sensorCode)
+      map[r.sensorCode] = existing || { alarmEnabled: 0, minValue: null, maxValue: null, hysteresis: 0, delayCount: 1, alarmLevel: 'warning' }
+    })
+    alarmForm.value = map
+  } catch(e) {}
+}
+
+const saveAlarm = async (sensorCode: string) => {
+  try {
+    await alarmConfigApi.save(deviceId, sensorCode, alarmForm.value[sensorCode])
+    ElMessage.success('告警配置已保存，即将下发至采集端')
+  } catch(e) {
+    ElMessage.error('保存失败')
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -113,6 +164,7 @@ onMounted(async () => {
     ])
     device.value = deviceRes ?? deviceRes?.data ?? {}
     readings.value = readingsRes?.data ?? readingsRes ?? []
+    await loadAlarmConfig()
   } catch {
     device.value = null
     readings.value = []
@@ -237,5 +289,39 @@ onMounted(async () => {
 .switch-row {
   text-align: center;
   margin-top: 8px;
+}
+
+.alarm-section {
+  background: #fff;
+  border: 0.5px solid #eee;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.alarm-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alarm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.alarm-sensor {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  min-width: 80px;
+}
+
+.alarm-unit {
+  font-size: 12px;
+  color: #888;
+  min-width: 30px;
 }
 </style>

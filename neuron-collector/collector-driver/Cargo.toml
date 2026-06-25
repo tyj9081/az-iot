@@ -17,3 +17,6 @@ crc = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 collector-model = { path = "../collector-model" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
