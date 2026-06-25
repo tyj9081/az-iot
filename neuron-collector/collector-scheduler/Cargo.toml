@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
 collector-model = { path = "../collector-model" }
+collector-uploader = { path = "../collector-uploader" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+rand = { workspace = true }
+chrono = { workspace = true }
