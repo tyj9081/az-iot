@@ -5,6 +5,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Remove stale cargo config
+        shell: pwsh
+        run: |
+          if (Test-Path "neuron-collector/.cargo/config.toml") { Remove-Item "neuron-collector/.cargo/config.toml" }
       - name: Install Rust
         run: |
           rustup toolchain install stable --target x86_64-pc-windows-msvc
@@ -12,7 +16,7 @@ jobs:
       - name: Build
         run: |
           cd neuron-collector
-          cargo build --release -p collector-bin 2>&1
+          cargo build --release -p collector-bin --target x86_64-pc-windows-msvc
       - name: Package
         shell: pwsh
         run: |
@@ -23,8 +27,9 @@ jobs:
           if (Test-Path "neuron-collector/config.toml") { Copy-Item "neuron-collector/config.toml" release/ }
           if ((Get-ChildItem release -Filter *.exe | Measure-Object).Count -gt 0) {
             Compress-Archive -Path release/* -DestinationPath neuron-collector-windows.zip
+            Write-Host "Package created: neuron-collector-windows.zip"
           } else {
-            Write-Host "No exe found, check build logs"
+            Write-Host "No exe found"
           }
       - uses: actions/upload-artifact@v4
         with:
