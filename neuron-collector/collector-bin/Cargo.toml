@@ -10,7 +10,6 @@ path = "src/main.rs"
 [dependencies]
 collector-model = { path = "../collector-model" }
 collector-scheduler = { path = "../collector-scheduler" }
-collector-driver = { path = "../collector-driver" }
 collector-reporter = { path = "../collector-reporter" }
 collector-uploader = { path = "../collector-uploader" }
 tokio = { workspace = true }
