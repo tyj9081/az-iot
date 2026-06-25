@@ -8,6 +8,7 @@ members = [
     "collector-reporter",
     "collector-storage",
     "collector-telemetry",
+    "collector-uploader",
     "collector-bin",
 ]
 
