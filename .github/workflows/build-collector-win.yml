@@ -12,14 +12,20 @@ jobs:
       - name: Build
         run: |
           cd neuron-collector
-          cargo build --release --target x86_64-pc-windows-msvc
+          cargo build --release -p collector-bin 2>&1
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release
-          Copy-Item "neuron-collector/target/x86_64-pc-windows-msvc/release/collector-bin.exe" release/
-          Copy-Item "neuron-collector/config.toml" release/ 2>$null
-          Compress-Archive -Path release/* -DestinationPath neuron-collector-windows.zip
+          Get-ChildItem -Recurse -Filter "collector-bin.exe" -Path "neuron-collector/target" | ForEach-Object {
+            Copy-Item $_.FullName release/
+          }
+          if (Test-Path "neuron-collector/config.toml") { Copy-Item "neuron-collector/config.toml" release/ }
+          if ((Get-ChildItem release -Filter *.exe | Measure-Object).Count -gt 0) {
+            Compress-Archive -Path release/* -DestinationPath neuron-collector-windows.zip
+          } else {
+            Write-Host "No exe found, check build logs"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: neuron-collector-windows
