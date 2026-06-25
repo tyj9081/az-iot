@@ -8,7 +8,7 @@ broker = "tcp://8.163.61.99:1883"
 client_id = "collector-win10-01"
 # MQTT 认证凭据
 username = "neuron-collector"
-password = "***"
+password = "collector2024!"
 # MQTT Topic 前缀, 上报到 neuron/{device_id}/latest
 topic_prefix = "neuron"
 
