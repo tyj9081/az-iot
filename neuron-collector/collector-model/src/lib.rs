@@ -2,14 +2,115 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProtocolType {
+    // === Serial Bus Protocols ===
     #[serde(rename = "MODBUS_RTU")]
     ModbusRTU,
+    #[serde(rename = "DL_T645_2007")]
+    DL645_2007,
+    #[serde(rename = "DL_T645_1997")]
+    DL645_1997,
+    #[serde(rename = "IEC_60870_5_101")]
+    IEC101,
+    #[serde(rename = "CAN_BUS")]
+    CanBus,
+    #[serde(rename = "PROFIBUS_DP")]
+    ProfibusDP,
+
+    // === TCP/IP Protocols ===
     #[serde(rename = "MODBUS_TCP")]
     ModbusTCP,
-    #[serde(rename = "DL_T645")]
-    DL645,
-    #[serde(rename = "AT_COMMAND")]
-    ATCommand,
+    #[serde(rename = "IEC_60870_5_104")]
+    IEC104,
+    #[serde(rename = "DNP3")]
+    DNP3,
+    #[serde(rename = "OPC_UA")]
+    OpcUa,
+    #[serde(rename = "BACNET_IP")]
+    BacnetIP,
+    #[serde(rename = "S7_COMM")]
+    S7Comm,
+    #[serde(rename = "FINS_TCP")]
+    FinsTcp,
+    #[serde(rename = "ETHERNET_IP")]
+    EthernetIP,
+    #[serde(rename = "MITSUBISHI_MC")]
+    MitsubishiMC,
+
+    // === Message / API Protocols ===
+    #[serde(rename = "MQTT")]
+    Mqtt,
+    #[serde(rename = "SNMP_V2C")]
+    SnmpV2c,
+    #[serde(rename = "HTTP_JSON")]
+    HttpJson,
+}
+
+impl ProtocolType {
+    /// 协议使用串口通信
+    pub fn is_serial(&self) -> bool {
+        matches!(self, Self::ModbusRTU | Self::DL645_2007 | Self::DL645_1997
+            | Self::IEC101 | Self::CanBus | Self::ProfibusDP)
+    }
+
+    /// 协议使用 TCP/IP 通信
+    pub fn is_tcp(&self) -> bool {
+        matches!(self, Self::ModbusTCP | Self::IEC104 | Self::DNP3 | Self::OpcUa
+            | Self::BacnetIP | Self::S7Comm | Self::FinsTcp | Self::EthernetIP
+            | Self::MitsubishiMC)
+    }
+
+    /// 协议使用 MQTT/SNMP/HTTP 等上层协议
+    pub fn is_app_layer(&self) -> bool {
+        matches!(self, Self::Mqtt | Self::SnmpV2c | Self::HttpJson)
+    }
+
+    /// 协议对应的 serde 标识码
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::ModbusRTU => "MODBUS_RTU",
+            Self::ModbusTCP => "MODBUS_TCP",
+            Self::DL645_2007 => "DL_T645_2007",
+            Self::DL645_1997 => "DL_T645_1997",
+            Self::IEC104 => "IEC_60870_5_104",
+            Self::IEC101 => "IEC_60870_5_101",
+            Self::DNP3 => "DNP3",
+            Self::OpcUa => "OPC_UA",
+            Self::Mqtt => "MQTT",
+            Self::BacnetIP => "BACNET_IP",
+            Self::SnmpV2c => "SNMP_V2C",
+            Self::HttpJson => "HTTP_JSON",
+            Self::CanBus => "CAN_BUS",
+            Self::S7Comm => "S7_COMM",
+            Self::ProfibusDP => "PROFIBUS_DP",
+            Self::EthernetIP => "ETHERNET_IP",
+            Self::FinsTcp => "FINS_TCP",
+            Self::MitsubishiMC => "MITSUBISHI_MC",
+        }
+    }
+
+    /// 协议的中文名称
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::ModbusRTU => "Modbus RTU",
+            Self::ModbusTCP => "Modbus TCP",
+            Self::DL645_2007 => "DL/T645-2007",
+            Self::DL645_1997 => "DL/T645-1997",
+            Self::IEC104 => "IEC 60870-5-104",
+            Self::IEC101 => "IEC 60870-5-101",
+            Self::DNP3 => "DNP3",
+            Self::OpcUa => "OPC UA",
+            Self::Mqtt => "MQTT",
+            Self::BacnetIP => "BACnet/IP",
+            Self::SnmpV2c => "SNMP v2c",
+            Self::HttpJson => "HTTP JSON",
+            Self::CanBus => "CAN Bus",
+            Self::S7Comm => "S7 Communication",
+            Self::ProfibusDP => "PROFIBUS DP",
+            Self::EthernetIP => "EtherNet/IP",
+            Self::FinsTcp => "FINS TCP",
+            Self::MitsubishiMC => "Mitsubishi MC",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -124,9 +225,9 @@ mod tests {
 
     #[test]
     fn test_deserialize_protocol_dl645() {
-        let json = r#"{"id":1,"code":"D","name":"x","protocol":"DL_T645","slave_addr":1,"bus":{"serial":{"port_name":"COM5","bus_param":{"baud":9600,"data_bits":8,"stop_bits":1,"parity":"none"}}},"collect_interval_sec":null,"data_points":[]}"#;
+        let json = r#"{"id":1,"code":"D","name":"x","protocol":"DL_T645_2007","slave_addr":1,"bus":{"serial":{"port_name":"COM5","bus_param":{"baud":9600,"data_bits":8,"stop_bits":1,"parity":"none"}}},"collect_interval_sec":null,"data_points":[]}"#;
         let device: Device = serde_json::from_str(json).unwrap();
-        assert_eq!(device.protocol, ProtocolType::DL645);
+        assert_eq!(device.protocol, ProtocolType::DL645_2007);
     }
 
     #[test]

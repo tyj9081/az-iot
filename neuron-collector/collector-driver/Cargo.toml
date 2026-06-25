@@ -5,6 +5,15 @@ edition = "2021"
 
 [dependencies]
 tokio = { workspace = true }
+tokio-serial = { workspace = true }
+tokio-modbus = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 rand = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+hex = { workspace = true }
+crc = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
 collector-model = { path = "../collector-model" }
