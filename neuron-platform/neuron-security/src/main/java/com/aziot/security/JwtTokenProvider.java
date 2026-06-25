@@ -19,6 +19,12 @@ public class JwtTokenProvider {
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.access-token-expiration}") long accessExpiration,
             @Value("${jwt.refresh-token-expiration}") long refreshExpiration) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalArgumentException(
+                "JWT_SECRET must be at least 256 bits (32 bytes). Got " +
+                (secret == null ? 0 : secret.length()) + " bytes."
+            );
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessExpiration = accessExpiration;
         this.refreshExpiration = refreshExpiration;
@@ -51,6 +57,10 @@ public class JwtTokenProvider {
 
     public Long getUserId(String token) {
         return parseClaims(token).get("userId", Long.class);
+    }
+
+    public String getTokenType(String token) {
+        return parseClaims(token).get("type", String.class);
     }
 
     public boolean validateToken(String token) {

@@ -8,6 +8,9 @@ import com.aziot.service.collector.DevCollectorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/collectors")
 @RequiredArgsConstructor
@@ -31,7 +34,8 @@ public class CollectorController {
     }
 
     @PostMapping
-    public ApiResponse<DevCollector> create(@RequestBody CollectorCreateDTO dto) {
+    @SuppressWarnings("unchecked")
+    public ApiResponse<Map<String, Object>> create(@RequestBody CollectorCreateDTO dto) {
         DevCollector collector = new DevCollector();
         collector.setCode(dto.getCode());
         collector.setName(dto.getName());
@@ -40,8 +44,16 @@ public class CollectorController {
         collector.setIpAddress(dto.getIpAddress());
         collector.setFirmwareVersion(dto.getFirmwareVersion());
         collector.setDescription(dto.getDescription());
-        collectorService.create(collector);
-        return ApiResponse.ok(collector);
+
+        String rawPassword = collectorService.createWithCredentials(collector);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("collector", collector);
+        Map<String, String> creds = new LinkedHashMap<>();
+        creds.put("mqttUsername", collector.getMqttUsername());
+        creds.put("mqttPassword", rawPassword);
+        result.put("mqttCredentials", creds);
+        return ApiResponse.ok(result);
     }
 
     @PutMapping("/{id}")

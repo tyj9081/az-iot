@@ -1,4 +1,5 @@
 use collector_model::Device;
+use rand::Rng;
 use std::collections::HashMap;
 
 pub trait ProtocolDriver: Send + Sync {
@@ -50,9 +51,5 @@ impl ProtocolDriver for MockModbusDriver {
 }
 
 fn rand_val() -> f64 {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-    let mut h = RandomState::new().build_hasher();
-    h.write_u64(0);
-    (h.finish() % 100) as f64 / 100.0
+    rand::thread_rng().gen()
 }

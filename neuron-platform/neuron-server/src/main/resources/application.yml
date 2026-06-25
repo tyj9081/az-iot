@@ -2,10 +2,17 @@ spring:
   application:
     name: neuron-server
   datasource:
-    url: jdbc:mysql://localhost:3306/az_iot?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: ${DB_PASSWORD:root}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 10000
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -16,9 +23,9 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: ${JWT_SECRET:az-iot-jwt-secret-key-must-be-at-least-256-bits-long}
-  access-token-expiration: 1800000
-  refresh-token-expiration: 604800000
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 server:
   port: 8080

@@ -34,6 +34,16 @@ public class DevCollector {
 
     private String description;
 
+    private String mqttUsername;
+
+    private String mqttPasswordHash;
+
+    private Integer mqttTlsEnabled;
+
+    private String mqttBrokerHost;
+
+    private Integer mqttBrokerPort;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

@@ -8,16 +8,22 @@ import com.aziot.dao.mapper.collector.DevSerialPortMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
 
 @Service
 public class DevCollectorService extends ServiceImpl<DevCollectorMapper, DevCollector> {
 
     private final DevSerialPortMapper devSerialPortMapper;
+    private final PasswordEncoder passwordEncoder;
 
-    public DevCollectorService(DevSerialPortMapper devSerialPortMapper) {
+    public DevCollectorService(DevSerialPortMapper devSerialPortMapper,
+                               PasswordEncoder passwordEncoder) {
         this.devSerialPortMapper = devSerialPortMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public Page<DevCollector> page(int page, int pageSize, String status, String keyword) {
@@ -43,9 +49,21 @@ public class DevCollectorService extends ServiceImpl<DevCollectorMapper, DevColl
 
     @Transactional
     public void create(DevCollector collector) {
+        createWithCredentials(collector);
+    }
+
+    @Transactional
+    public String createWithCredentials(DevCollector collector) {
         if (existsByCode(collector.getCode())) {
             throw new BusinessException(409, "采集器编码已存在");
         }
+        String rawPassword = generatePassword();
+        collector.setMqttUsername(generateUsername());
+        collector.setMqttPasswordHash(passwordEncoder.encode(rawPassword));
+        if (collector.getMqttTlsEnabled() == null) collector.setMqttTlsEnabled(0);
+        if (collector.getMqttBrokerHost() == null) collector.setMqttBrokerHost("localhost");
+        if (collector.getMqttBrokerPort() == null) collector.setMqttBrokerPort(1883);
+
         save(collector);
 
         String busParam = "{\"baud\":9600,\"data_bits\":8,\"stop_bits\":1,\"parity\":\"none\"}";
@@ -62,6 +80,7 @@ public class DevCollectorService extends ServiceImpl<DevCollectorMapper, DevColl
         for (int i = 5; i <= 10; i++) {
             createSerialPort(collector.getId(), "COM" + i, "device", "serial", busParam);
         }
+        return rawPassword;
     }
 
     private void createSerialPort(Long collectorId, String portName, String portType, String busType, String busParam) {
@@ -104,5 +123,25 @@ public class DevCollectorService extends ServiceImpl<DevCollectorMapper, DevColl
     private boolean existsByCode(String code) {
         return getOne(new LambdaQueryWrapper<DevCollector>()
                 .eq(DevCollector::getCode, code)) != null;
+    }
+
+    private String generateUsername() {
+        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder("col-");
+        for (int i = 0; i < 8; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+
+    private String generatePassword() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 16; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 }

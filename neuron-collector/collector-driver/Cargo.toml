@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 tokio = { workspace = true }
 anyhow = { workspace = true }
+rand = { workspace = true }
 collector-model = { path = "../collector-model" }

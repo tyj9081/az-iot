@@ -46,6 +46,11 @@
         </dependency>
         <dependency>
             <groupId>com.aziot</groupId>
+            <artifactId>neuron-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.aziot</groupId>
             <artifactId>neuron-dao</artifactId>
             <version>${project.version}</version>
         </dependency>

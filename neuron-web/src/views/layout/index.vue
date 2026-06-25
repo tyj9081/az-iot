@@ -23,5 +23,15 @@
 </template>
 
 <script setup lang="ts">
-const logout = () => { /* Task 10 实现 */ }
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const logout = () => {
+  authStore.clearAuth()
+  localStorage.removeItem('refresh_token')
+  router.push('/login')
+}
 </script>
