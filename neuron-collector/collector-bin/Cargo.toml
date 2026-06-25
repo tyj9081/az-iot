@@ -3,12 +3,19 @@ name = "collector-bin"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "collector-bin"
+path = "src/main.rs"
+
 [dependencies]
 collector-model = { path = "../collector-model" }
 collector-scheduler = { path = "../collector-scheduler" }
 collector-driver = { path = "../collector-driver" }
 collector-reporter = { path = "../collector-reporter" }
+collector-uploader = { path = "../collector-uploader" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
+serde = { workspace = true }
+toml = "0.8"
