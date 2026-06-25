@@ -86,9 +86,9 @@
 | PUT | /devices/{id} | 更新 → MQTT delta |
 | DELETE | /devices/{id} | 软删除 → MQTT delta(remove) |
 | PUT | /devices/{id}/status | 启用/禁用 |
-| GET | /devices/{id}/alarm-config | 告警配置列表 |
-| PUT | /devices/{id}/alarm-config/{sensorCode} | 设置告警阈值 → MQTT delta |
-| DELETE | /devices/{id}/alarm-config/{sensorCode} | 删除告警 → MQTT delta |
+| GET | /devices/{id}/alarm-config | 告警规则列表 |
+| PUT | /devices/{id}/alarm-config/{alarmType}/{sensorCode} | 设置告警规则(10种类型) → MQTT delta |
+| DELETE | /devices/{id}/alarm-config/{alarmType}/{sensorCode} | 删除告警规则 → MQTT delta |
 
 ## 读数
 

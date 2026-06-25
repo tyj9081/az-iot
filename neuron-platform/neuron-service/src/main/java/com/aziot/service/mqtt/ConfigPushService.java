@@ -84,12 +84,10 @@ public class ConfigPushService {
             for (DevDeviceAlarmConfig ac : alarms) {
                 Map<String, Object> acm = new LinkedHashMap<>();
                 acm.put("sensor_code", ac.getSensorCode());
+                acm.put("alarm_type", ac.getAlarmType());
                 acm.put("enabled", true);
-                if (ac.getMinValue() != null) acm.put("min", ac.getMinValue());
-                if (ac.getMaxValue() != null) acm.put("max", ac.getMaxValue());
-                acm.put("hysteresis", ac.getHysteresis());
-                acm.put("delay_count", ac.getDelayCount());
                 acm.put("level", ac.getAlarmLevel());
+                acm.put("params", objectMapper.readTree(ac.getParams()));
                 alarmList.add(acm);
             }
             deviceNode.put("alarm_config", alarmList);

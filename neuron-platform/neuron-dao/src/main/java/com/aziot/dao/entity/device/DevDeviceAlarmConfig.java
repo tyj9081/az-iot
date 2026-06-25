@@ -2,7 +2,6 @@ package com.aziot.dao.entity.device;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -13,11 +12,9 @@ public class DevDeviceAlarmConfig {
     private Long deviceId;
     private String sensorCode;
     private Integer alarmEnabled;
-    private BigDecimal minValue;
-    private BigDecimal maxValue;
-    private BigDecimal hysteresis;
-    private Integer delayCount;
-    private String alarmLevel;
+    private String alarmType;       // limit_upper, limit_lower, limit_both, rate_rise, rate_fall, deviation, di_change, timeout, deadband, custom
+    private String params;          // JSON string
+    private String alarmLevel;      // info, warning, critical
     private String description;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

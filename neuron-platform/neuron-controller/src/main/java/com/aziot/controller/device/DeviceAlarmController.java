@@ -21,20 +21,22 @@ public class DeviceAlarmController {
         return ApiResponse.ok(alarmConfigService.listByDeviceId(deviceId));
     }
 
-    @PutMapping("/{deviceId}/alarm-config/{sensorCode}")
+    @PutMapping("/{deviceId}/alarm-config/{alarmType}/{sensorCode}")
     public ApiResponse<DevDeviceAlarmConfig> save(
             @PathVariable Long deviceId,
+            @PathVariable String alarmType,
             @PathVariable String sensorCode,
             @RequestBody DevDeviceAlarmConfig config) {
+        config.setAlarmType(alarmType);
         alarmConfigService.saveOrUpdateAlarm(deviceId, sensorCode, config);
-        // 告警配置变更→MQTT下发
         configPushService.pushDelta(deviceId, "update");
         return ApiResponse.ok(config);
     }
 
-    @DeleteMapping("/{deviceId}/alarm-config/{sensorCode}")
+    @DeleteMapping("/{deviceId}/alarm-config/{alarmType}/{sensorCode}")
     public ApiResponse<Void> delete(
             @PathVariable Long deviceId,
+            @PathVariable String alarmType,
             @PathVariable String sensorCode) {
         alarmConfigService.deleteByDeviceAndSensor(deviceId, sensorCode);
         configPushService.pushDelta(deviceId, "update");

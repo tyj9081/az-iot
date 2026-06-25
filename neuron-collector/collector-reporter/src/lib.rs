@@ -59,45 +59,72 @@ impl Aggregator {
 
 /// Edge alarm engine
 pub struct AlarmEngine {
-    thresholds: HashMap<String, Vec<DeviceAlarmThreshold>>,
+    thresholds: HashMap<i64, Vec<DeviceAlarmThreshold>>,
 }
 
 impl AlarmEngine {
-    pub fn new() -> Self {
-        Self { thresholds: HashMap::new() }
+    pub fn new() -> Self { Self { thresholds: HashMap::new() } }
+
+    pub fn load_from_device(&mut self, device_id: i64, configs: Vec<DeviceAlarmThreshold>) {
+        self.thresholds.insert(device_id, configs);
     }
 
-    pub fn load_from_device(&mut self, device_id: i64, configs: &[DeviceAlarmThreshold]) {
-        let key = format!("{}_{}", device_id, "alarms");
-        self.thresholds.insert(key, configs.to_vec());
-    }
-
-    pub fn check(&self, device_id: i64, sensor_code: &str, value: f64) -> Option<Vec<String>> {
-        let key = format!("{}_{}", device_id, "alarms");
-        let configs = self.thresholds.get(&key)?;
+    pub fn check(&self, device_id: i64, sensor_code: &str, current_value: f64, previous_value: Option<f64>) -> Vec<String> {
+        let configs = match self.thresholds.get(&device_id) {
+            Some(c) => c,
+            None => return vec![],
+        };
         let mut alarms = Vec::new();
         for cfg in configs {
-            if cfg.sensor_code != sensor_code || !cfg.enabled {
-                continue;
-            }
-            if let Some(min) = cfg.min {
-                if value < min - cfg.hysteresis {
-                    alarms.push(format!("{}_LOW: {:.3}<{:.3}", sensor_code, value, min));
-                }
-            }
-            if let Some(max) = cfg.max {
-                if value > max + cfg.hysteresis {
-                    alarms.push(format!("{}_HIGH: {:.3}>{:.3}", sensor_code, value, max));
-                }
+            if !cfg.enabled || cfg.sensor_code != sensor_code { continue; }
+            if let Some(msg) = self.evaluate(cfg, current_value, previous_value) {
+                alarms.push(msg);
             }
         }
-        if alarms.is_empty() { None } else { Some(alarms) }
+        alarms
+    }
+
+    fn evaluate(&self, cfg: &DeviceAlarmThreshold, value: f64, _prev: Option<f64>) -> Option<String> {
+        let p = &cfg.params;
+        match cfg.alarm_type.as_str() {
+            "limit_upper" => {
+                let max = p["max"].as_f64()?;
+                let hyst = p.get("hysteresis").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                if value > max + hyst { Some(format!("HIGH: {:.2}>{:.2}", value, max)) } else { None }
+            },
+            "limit_lower" => {
+                let min = p["min"].as_f64()?;
+                let hyst = p.get("hysteresis").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                if value < min - hyst { Some(format!("LOW: {:.2}<{:.2}", value, min)) } else { None }
+            },
+            "limit_both" => {
+                let min = p["min"].as_f64()?;
+                let max = p["max"].as_f64()?;
+                let hyst = p.get("hysteresis").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                if value > max + hyst { Some(format!("HIGH: {:.2}>{:.2}", value, max)) }
+                else if value < min - hyst { Some(format!("LOW: {:.2}<{:.2}", value, min)) }
+                else { None }
+            },
+            "di_change" => {
+                let trigger_on = p["trigger_on"].as_i64()?;
+                let int_val = value as i64;
+                if int_val == trigger_on {
+                    Some(format!("DI_CHANGE: triggered {}", trigger_on))
+                } else { None }
+            },
+            "timeout" => {
+                let timeout = p["timeout_sec"].as_f64()?;
+                if value <= 0.0 { Some(format!("TIMEOUT: no response for {}s", timeout)) } else { None }
+            },
+            _ => None, // rate_rise/fall/deviation/deadband: Phase 2 实现
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_aggregator_flush() {
@@ -121,43 +148,67 @@ mod tests {
     }
 
     #[test]
-    fn test_alarm_engine_low() {
+    fn test_alarm_engine_limit_upper() {
         let mut engine = AlarmEngine::new();
         let configs = vec![DeviceAlarmThreshold {
             sensor_code: "voltage".into(),
+            alarm_type: "limit_upper".into(),
             enabled: true,
-            min: Some(200.0),
-            max: Some(240.0),
-            hysteresis: 0.0,
-            delay_count: 1,
             level: "warning".into(),
+            params: json!({"max": 240.0, "hysteresis": 0.0, "delay_count": 3}),
         }];
-        engine.load_from_device(1, &configs);
-        let alarms = engine.check(1, "voltage", 190.0);
-        assert!(alarms.is_some());
-        let alarm_list = alarms.unwrap();
-        assert!(!alarm_list.is_empty());
-        assert!(alarm_list[0].contains("LOW"));
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "voltage", 250.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("HIGH"));
     }
 
     #[test]
-    fn test_alarm_engine_high() {
+    fn test_alarm_engine_limit_lower() {
         let mut engine = AlarmEngine::new();
         let configs = vec![DeviceAlarmThreshold {
             sensor_code: "voltage".into(),
+            alarm_type: "limit_lower".into(),
             enabled: true,
-            min: Some(200.0),
-            max: Some(240.0),
-            hysteresis: 0.0,
-            delay_count: 1,
             level: "warning".into(),
+            params: json!({"min": 200.0, "hysteresis": 0.0, "delay_count": 3}),
         }];
-        engine.load_from_device(1, &configs);
-        let alarms = engine.check(1, "voltage", 250.0);
-        assert!(alarms.is_some());
-        let alarm_list = alarms.unwrap();
-        assert!(!alarm_list.is_empty());
-        assert!(alarm_list[0].contains("HIGH"));
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "voltage", 190.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("LOW"));
+    }
+
+    #[test]
+    fn test_alarm_engine_limit_both_high() {
+        let mut engine = AlarmEngine::new();
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "voltage".into(),
+            alarm_type: "limit_both".into(),
+            enabled: true,
+            level: "warning".into(),
+            params: json!({"min": 200.0, "max": 240.0, "hysteresis": 0.0, "delay_count": 3}),
+        }];
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "voltage", 250.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("HIGH"));
+    }
+
+    #[test]
+    fn test_alarm_engine_limit_both_low() {
+        let mut engine = AlarmEngine::new();
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "voltage".into(),
+            alarm_type: "limit_both".into(),
+            enabled: true,
+            level: "warning".into(),
+            params: json!({"min": 200.0, "max": 240.0, "hysteresis": 0.0, "delay_count": 3}),
+        }];
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "voltage", 190.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("LOW"));
     }
 
     #[test]
@@ -165,15 +216,45 @@ mod tests {
         let mut engine = AlarmEngine::new();
         let configs = vec![DeviceAlarmThreshold {
             sensor_code: "voltage".into(),
+            alarm_type: "limit_both".into(),
             enabled: true,
-            min: Some(200.0),
-            max: Some(240.0),
-            hysteresis: 0.0,
-            delay_count: 1,
             level: "warning".into(),
+            params: json!({"min": 200.0, "max": 240.0, "hysteresis": 0.0, "delay_count": 3}),
         }];
-        engine.load_from_device(1, &configs);
-        let alarms = engine.check(1, "voltage", 220.0);
-        assert!(alarms.is_none());
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "voltage", 220.0, None);
+        assert!(alarms.is_empty());
+    }
+
+    #[test]
+    fn test_alarm_engine_di_change() {
+        let mut engine = AlarmEngine::new();
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "smoke".into(),
+            alarm_type: "di_change".into(),
+            enabled: true,
+            level: "critical".into(),
+            params: json!({"trigger_on": 1}),
+        }];
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "smoke", 1.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("DI_CHANGE"));
+    }
+
+    #[test]
+    fn test_alarm_engine_timeout() {
+        let mut engine = AlarmEngine::new();
+        let configs = vec![DeviceAlarmThreshold {
+            sensor_code: "comm".into(),
+            alarm_type: "timeout".into(),
+            enabled: true,
+            level: "warning".into(),
+            params: json!({"timeout_sec": 30}),
+        }];
+        engine.load_from_device(1, configs);
+        let alarms = engine.check(1, "comm", 0.0, None);
+        assert_eq!(alarms.len(), 1);
+        assert!(alarms[0].contains("TIMEOUT"));
     }
 }

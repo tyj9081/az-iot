@@ -168,6 +168,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "collector-model",
+ "serde_json",
  "tokio",
  "tracing",
 ]

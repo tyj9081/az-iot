@@ -152,12 +152,10 @@ pub struct DataPoint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceAlarmThreshold {
     pub sensor_code: String,
+    pub alarm_type: String,     // limit_upper, limit_lower, limit_both, rate_rise, rate_fall, deviation, di_change, timeout, deadband, custom
     pub enabled: bool,
-    pub min: Option<f64>,
-    pub max: Option<f64>,
-    pub hysteresis: f64,
-    pub delay_count: u32,
-    pub level: String,
+    pub level: String,          // info, warning, critical
+    pub params: serde_json::Value,  // 各类型参数 JSON
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

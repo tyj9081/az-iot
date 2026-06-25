@@ -22,7 +22,8 @@ public class DevDeviceAlarmConfigService extends ServiceImpl<DevDeviceAlarmConfi
         config.setSensorCode(sensorCode);
         DevDeviceAlarmConfig existing = getOne(new LambdaQueryWrapper<DevDeviceAlarmConfig>()
                 .eq(DevDeviceAlarmConfig::getDeviceId, deviceId)
-                .eq(DevDeviceAlarmConfig::getSensorCode, sensorCode));
+                .eq(DevDeviceAlarmConfig::getSensorCode, sensorCode)
+                .eq(DevDeviceAlarmConfig::getAlarmType, config.getAlarmType()));
         if (existing != null) {
             config.setId(existing.getId());
             updateById(config);
