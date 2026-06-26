@@ -161,12 +161,28 @@
             v-model="form.deviceModelId"
             placeholder="选择型号"
             style="width: 100%"
+            @change="onModelChange"
           >
             <el-option
               v-for="m in dialogModelOptions"
               :key="m.id"
               :label="m.name + ' (' + m.code + ')'"
               :value="m.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="协议">
+          <el-select
+            v-model="form.protocolId"
+            placeholder="请先选择型号"
+            disabled
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in dialogProtocolOptions"
+              :key="p.id"
+              :label="p.name"
+              :value="p.id"
             />
           </el-select>
         </el-form-item>
@@ -198,6 +214,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { deviceApi } from '@/api/device'
 import { collectorApi } from '@/api/collector'
 import { deviceModelApi } from '@/api/device-model'
+import { protocolApi } from '@/api/protocol'
 
 const router = useRouter()
 
@@ -227,6 +244,7 @@ const form = reactive({
   collectorId: null as number | null,
   serialPortId: null as number | null,
   deviceModelId: null as number | null,
+  protocolId: null as number | null,
   slaveAddr: 1,
   collectInterval: ''
 })
@@ -243,6 +261,8 @@ const rules: FormRules = {
 const dialogCollectorOptions = ref<any[]>([])
 const dialogSerialPortOptions = ref<any[]>([])
 const dialogModelOptions = ref<any[]>([])
+const dialogProtocolOptions = ref<any[]>([])
+const displayProtocolName = ref('')
 
 function statusTagType(status: string): '' | 'success' | 'info' | 'warning' | 'danger' {
   const map: Record<string, '' | 'success' | 'info' | 'warning' | 'danger'> = {
@@ -333,6 +353,23 @@ async function onDialogCollectorChange(val: number | null) {
   }
 }
 
+function onModelChange(val: number | null) {
+  form.protocolId = null
+  displayProtocolName.value = ''
+  if (val) {
+    const model = dialogModelOptions.value.find((m: any) => m.id === val)
+    if (model) {
+      form.protocolId = model.protocol_id ?? model.protocolId ?? null
+      displayProtocolName.value = model.protocol_name ?? model.protocolName ?? ''
+      // 同步 protocol options 以便 disabled select 显示
+      dialogProtocolOptions.value = [{
+        id: form.protocolId,
+        name: displayProtocolName.value
+      }]
+    }
+  }
+}
+
 async function openDialog(row?: any) {
   isEdit.value = !!row
 
@@ -357,8 +394,18 @@ async function openDialog(row?: any) {
     form.collectorId = row.collectorId ?? null
     form.serialPortId = row.serialPortId ?? null
     form.deviceModelId = row.deviceModelId ?? null
+    form.protocolId = row.protocolId ?? null
     form.slaveAddr = row.slaveAddr ?? 1
     form.collectInterval = row.collectInterval ?? ''
+
+    // 回显协议信息
+    if (row.protocolId) {
+      displayProtocolName.value = row.protocolName ?? row.protocol_name ?? ''
+      dialogProtocolOptions.value = [{
+        id: row.protocolId,
+        name: displayProtocolName.value
+      }]
+    }
 
     // load serial ports for the selected collector
     if (row.collectorId) {
@@ -382,9 +429,12 @@ function resetForm() {
   form.collectorId = null
   form.serialPortId = null
   form.deviceModelId = null
+  form.protocolId = null
   form.slaveAddr = 1
   form.collectInterval = ''
   dialogSerialPortOptions.value = []
+  dialogProtocolOptions.value = []
+  displayProtocolName.value = ''
 }
 
 async function handleSubmit() {
@@ -398,6 +448,7 @@ async function handleSubmit() {
       collectorId: form.collectorId,
       serialPortId: form.serialPortId,
       deviceModelId: form.deviceModelId,
+      protocolId: form.protocolId,
       slaveAddr: form.slaveAddr,
       collectInterval: form.collectInterval ? Number(form.collectInterval) : undefined
     }

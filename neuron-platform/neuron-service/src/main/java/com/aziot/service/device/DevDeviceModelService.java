@@ -121,7 +121,6 @@ public class DevDeviceModelService extends ServiceImpl<DevDeviceModelMapper, Dev
         dst.setProtocolId(src.getProtocolId());
         dst.setCode(src.getCode());
         dst.setName(src.getName());
-        dst.setCollectIntervalSec(src.getCollectIntervalSec());
         dst.setDescription(src.getDescription());
         dst.setIsEnabled(src.getIsEnabled());
         dst.setCreatedAt(src.getCreatedAt());

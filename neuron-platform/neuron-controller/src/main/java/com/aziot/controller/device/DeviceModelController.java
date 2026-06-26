@@ -40,7 +40,6 @@ public class DeviceModelController {
         model.setProtocolId(dto.getProtocolId());
         model.setCode(dto.getCode());
         model.setName(dto.getName());
-        model.setCollectIntervalSec(dto.getCollectIntervalSec());
         model.setDescription(dto.getDescription());
         deviceModelService.create(model);
         return ApiResponse.ok(model);
@@ -53,7 +52,6 @@ public class DeviceModelController {
         model.setProtocolId(dto.getProtocolId());
         model.setCode(dto.getCode());
         model.setName(dto.getName());
-        model.setCollectIntervalSec(dto.getCollectIntervalSec());
         model.setDescription(dto.getDescription());
         deviceModelService.update(id, model);
         return ApiResponse.ok(deviceModelService.getById(id));

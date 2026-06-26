@@ -9,6 +9,7 @@ public class CollectorCreateDTO {
     private String type;
     private String mqttClientId;
     private String ipAddress;
+    private Integer collectIntervalSec;
     private String firmwareVersion;
     private String description;
 }

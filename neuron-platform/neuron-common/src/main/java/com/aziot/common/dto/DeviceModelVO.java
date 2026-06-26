@@ -11,7 +11,6 @@ public class DeviceModelVO {
     private Long protocolId;
     private String code;
     private String name;
-    private Integer collectIntervalSec;
     private String description;
     private Integer isEnabled;
     private LocalDateTime createdAt;

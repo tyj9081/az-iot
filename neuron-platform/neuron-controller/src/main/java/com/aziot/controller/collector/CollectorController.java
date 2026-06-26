@@ -42,6 +42,7 @@ public class CollectorController {
         collector.setType(dto.getType());
         collector.setMqttClientId(dto.getMqttClientId());
         collector.setIpAddress(dto.getIpAddress());
+        collector.setCollectIntervalSec(dto.getCollectIntervalSec());
         collector.setFirmwareVersion(dto.getFirmwareVersion());
         collector.setDescription(dto.getDescription());
 
@@ -64,6 +65,7 @@ public class CollectorController {
         collector.setType(dto.getType());
         collector.setMqttClientId(dto.getMqttClientId());
         collector.setIpAddress(dto.getIpAddress());
+        collector.setCollectIntervalSec(dto.getCollectIntervalSec());
         collector.setFirmwareVersion(dto.getFirmwareVersion());
         collector.setDescription(dto.getDescription());
         collectorService.update(id, collector);

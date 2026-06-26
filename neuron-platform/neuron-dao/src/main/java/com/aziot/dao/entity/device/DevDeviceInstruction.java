@@ -10,19 +10,32 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("dev_device_model")
-public class DevDeviceModel {
+@TableName("dev_device_instruction")
+public class DevDeviceInstruction {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long manufacturerId;
+    private Long deviceId;
 
-    private Long protocolId;
+    private String instructionCode;
 
-    private String code;
+    private String instructionName;
 
-    private String name;
+    /** READ / WRITE / CONTROL / CONFIG */
+    private String instructionType;
+
+    /** e.g. 0x03 = Read Holding Registers */
+    private String funcCode;
+
+    private Integer registerAddress;
+
+    private Integer registerCount;
+
+    /** JSON: extra params like dataType, byteOrder, coefficient, etc. */
+    private String params;
+
+    private Integer sortOrder;
 
     private String description;
 

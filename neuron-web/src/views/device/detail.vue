@@ -139,6 +139,94 @@
         </template>
       </el-dialog>
     </div>
+
+    <!-- 设备指令管理 -->
+    <div class="instruction-section">
+      <h3 style="font-size:14px;font-weight:500;margin-bottom:12px;">设备指令管理</h3>
+      <el-button type="primary" size="small" @click="openInstrDialog()" style="margin-bottom:12px">+ 添加指令</el-button>
+
+      <el-table :data="instructions" size="small" v-if="instructions.length > 0">
+        <el-table-column prop="instructionCode" label="指令编码" width="140"/>
+        <el-table-column prop="instructionName" label="指令名称" width="150"/>
+        <el-table-column prop="instructionType" label="类型" width="90">
+          <template #default="{row}">
+            <el-tag size="small" :type="instrTypeTag(row.instructionType)">{{ instrTypeLabel(row.instructionType) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="funcCode" label="功能码" width="80"/>
+        <el-table-column label="寄存器地址" width="120">
+          <template #default="{row}">
+            0x{{ row.registerAddress?.toString(16)?.toUpperCase() }} ({{ row.registerAddress }})
+          </template>
+        </el-table-column>
+        <el-table-column prop="registerCount" label="数量" width="70"/>
+        <el-table-column prop="sortOrder" label="排序" width="70"/>
+        <el-table-column label="操作" width="140">
+          <template #default="{row}">
+            <el-button size="small" text type="primary" @click="openInstrDialog(row)">编辑</el-button>
+            <el-button size="small" text type="danger" @click="deleteInstruction(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="暂无配置指令" :image-size="60"/>
+
+      <!-- 指令弹窗 -->
+      <el-dialog :title="editingInstr ? '编辑指令' : '添加指令'" v-model="instrDialogVisible" width="560px" @closed="resetInstrForm">
+        <el-form :model="instrForm" label-width="110px" size="small">
+          <el-form-item label="指令编码" required>
+            <el-input v-model="instrForm.instructionCode" placeholder="如: read_temp, write_relay"/>
+          </el-form-item>
+          <el-form-item label="指令名称" required>
+            <el-input v-model="instrForm.instructionName" placeholder="如: 读取温度"/>
+          </el-form-item>
+          <el-form-item label="指令类型" required>
+            <el-select v-model="instrForm.instructionType" style="width:100%">
+              <el-option label="读取 (READ)" value="READ"/>
+              <el-option label="写入 (WRITE)" value="WRITE"/>
+              <el-option label="控制 (CONTROL)" value="CONTROL"/>
+              <el-option label="配置 (CONFIG)" value="CONFIG"/>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="功能码">
+            <el-select v-model="instrForm.funcCode" style="width:100%">
+              <el-option label="0x01 - 读线圈" value="0x01"/>
+              <el-option label="0x02 - 读离散输入" value="0x02"/>
+              <el-option label="0x03 - 读保持寄存器" value="0x03"/>
+              <el-option label="0x04 - 读输入寄存器" value="0x04"/>
+              <el-option label="0x05 - 写单线圈" value="0x05"/>
+              <el-option label="0x06 - 写单寄存器" value="0x06"/>
+              <el-option label="0x0F - 写多线圈" value="0x0F"/>
+              <el-option label="0x10 - 写多寄存器" value="0x10"/>
+            </el-select>
+          </el-form-item>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="寄存器地址">
+                <el-input-number v-model="instrForm.registerAddress" :min="0" :max="65535" style="width:100%"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="寄存器数量">
+                <el-input-number v-model="instrForm.registerCount" :min="1" :max="125" style="width:100%"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="扩展参数(JSON)">
+            <el-input v-model="instrForm.params" type="textarea" :rows="2" placeholder='如: {"dataType":"float32","byteOrder":"ABCD"}'/>
+          </el-form-item>
+          <el-form-item label="排序">
+            <el-input-number v-model="instrForm.sortOrder" :min="0" :max="999" style="width:100%"/>
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input v-model="instrForm.description" placeholder="指令说明" type="textarea" :rows="2"/>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="instrDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveInstruction" :loading="savingInstr">保存</el-button>
+        </template>
+      </el-dialog>
+    </div>
   </div>
 </template>
 
@@ -149,6 +237,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { readingApi } from '@/api/reading'
 import { deviceApi } from '@/api/device'
 import { alarmConfigApi } from '@/api/alarm-config'
+import { instructionApi } from '@/api/device-instruction'
 
 const route = useRoute()
 const deviceId = Number(route.params.id)
@@ -302,6 +391,106 @@ const deleteAlarm = async (row: any) => {
   } catch(e) {}
 }
 
+// ─── 设备指令管理 ───
+const instructions = ref<any[]>([])
+const instrDialogVisible = ref(false)
+const savingInstr = ref(false)
+const editingInstr = ref<any>(null)
+const instrForm = reactive({
+  instructionCode: '',
+  instructionName: '',
+  instructionType: 'READ',
+  funcCode: '0x03',
+  registerAddress: 0,
+  registerCount: 1,
+  params: '',
+  sortOrder: 0,
+  description: ''
+})
+
+const instrTypeTag = (t: string): '' | 'success' | 'info' | 'warning' | 'danger' => {
+  const map: Record<string, '' | 'success' | 'info' | 'warning' | 'danger'> = {
+    READ: '', WRITE: 'warning', CONTROL: 'danger', CONFIG: 'info'
+  }
+  return map[t] ?? ''
+}
+
+const instrTypeLabel = (t: string) => {
+  const map: Record<string, string> = { READ: '读取', WRITE: '写入', CONTROL: '控制', CONFIG: '配置' }
+  return map[t] ?? t
+}
+
+const loadInstructions = async () => {
+  try {
+    const res: any = await instructionApi.list(deviceId)
+    instructions.value = res?.data ?? []
+  } catch { instructions.value = [] }
+}
+
+const openInstrDialog = (row?: any) => {
+  editingInstr.value = row ?? null
+  if (row) {
+    instrForm.instructionCode = row.instructionCode
+    instrForm.instructionName = row.instructionName
+    instrForm.instructionType = row.instructionType ?? 'READ'
+    instrForm.funcCode = row.funcCode ?? '0x03'
+    instrForm.registerAddress = row.registerAddress ?? 0
+    instrForm.registerCount = row.registerCount ?? 1
+    instrForm.params = row.params ?? ''
+    instrForm.sortOrder = row.sortOrder ?? 0
+    instrForm.description = row.description ?? ''
+  }
+  instrDialogVisible.value = true
+}
+
+const resetInstrForm = () => {
+  editingInstr.value = null
+  instrForm.instructionCode = ''
+  instrForm.instructionName = ''
+  instrForm.instructionType = 'READ'
+  instrForm.funcCode = '0x03'
+  instrForm.registerAddress = 0
+  instrForm.registerCount = 1
+  instrForm.params = ''
+  instrForm.sortOrder = 0
+  instrForm.description = ''
+}
+
+const saveInstruction = async () => {
+  savingInstr.value = true
+  try {
+    const payload = {
+      instructionCode: instrForm.instructionCode,
+      instructionName: instrForm.instructionName,
+      instructionType: instrForm.instructionType,
+      funcCode: instrForm.funcCode,
+      registerAddress: instrForm.registerAddress,
+      registerCount: instrForm.registerCount,
+      params: instrForm.params || undefined,
+      sortOrder: instrForm.sortOrder,
+      description: instrForm.description
+    }
+    if (editingInstr.value) {
+      await instructionApi.update(deviceId, editingInstr.value.id, payload)
+      ElMessage.success('指令更新成功')
+    } else {
+      await instructionApi.create(deviceId, payload)
+      ElMessage.success('指令创建成功')
+    }
+    instrDialogVisible.value = false
+    await loadInstructions()
+  } catch { ElMessage.error('保存失败') } finally { savingInstr.value = false }
+}
+
+const deleteInstruction = async (row: any) => {
+  await ElMessageBox.confirm('确认删除此指令?', '删除确认', { type: 'warning' })
+  try {
+    await instructionApi.remove(deviceId, row.id)
+    ElMessage.success('已删除')
+    await loadInstructions()
+  } catch {}
+}
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -312,6 +501,7 @@ onMounted(async () => {
     device.value = deviceRes ?? deviceRes?.data ?? {}
     readings.value = readingsRes?.data ?? readingsRes ?? []
     await loadAlarmConfig()
+    await loadInstructions()
   } catch {
     device.value = null
     readings.value = []
@@ -439,6 +629,14 @@ onMounted(async () => {
 }
 
 .alarm-section {
+  background: #fff;
+  border: 0.5px solid #eee;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.instruction-section {
   background: #fff;
   border: 0.5px solid #eee;
   border-radius: 8px;

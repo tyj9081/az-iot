@@ -48,7 +48,6 @@
       <el-table-column prop="name" label="名称" min-width="150" />
       <el-table-column prop="manufacturer_name" label="厂商" min-width="120" />
       <el-table-column prop="protocol_name" label="协议" min-width="100" />
-      <el-table-column prop="collect_interval" label="采集间隔(s)" min-width="110" />
       <el-table-column prop="created_at" label="创建时间" min-width="160" />
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
@@ -113,14 +112,6 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入名称" />
         </el-form-item>
-        <el-form-item label="采集间隔(s)" prop="collect_interval_sec">
-          <el-input-number
-            v-model="form.collect_interval_sec"
-            :min="1"
-            :max="3600"
-            style="width: 100%"
-          />
-        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -172,7 +163,6 @@ const form = reactive({
   protocol_id: null as number | null,
   code: '',
   name: '',
-  collect_interval_sec: 10,
   description: ''
 })
 
@@ -180,8 +170,7 @@ const rules: FormRules = {
   manufacturer_id: [{ required: true, message: '请选择厂商', trigger: 'change' }],
   protocol_id: [{ required: true, message: '请选择协议', trigger: 'change' }],
   code: [{ required: true, message: '请输入编码', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  collect_interval_sec: [{ required: true, message: '请输入采集间隔', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入名称', trigger: 'blur' }]
 }
 
 async function loadManufacturers() {
@@ -225,7 +214,6 @@ function openDialog(row?: any) {
     form.protocol_id = row.protocol_id
     form.code = row.code
     form.name = row.name
-    form.collect_interval_sec = row.collect_interval ?? 10
     form.description = row.description ?? ''
   }
   dialogVisible.value = true
@@ -238,7 +226,6 @@ function resetForm() {
   form.protocol_id = null
   form.code = ''
   form.name = ''
-  form.collect_interval_sec = 10
   form.description = ''
 }
 
@@ -252,7 +239,6 @@ async function handleSubmit() {
       protocolId: form.protocol_id,
       code: form.code,
       name: form.name,
-      collectIntervalSec: form.collect_interval_sec,
       description: form.description
     }
     if (isEdit.value && form.id) {

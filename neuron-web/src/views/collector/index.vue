@@ -91,6 +91,7 @@
       <el-table-column prop="type" label="型号" width="120" />
       <el-table-column prop="mqttClientId" label="MQTT客户端ID" min-width="180" />
       <el-table-column prop="ipAddress" label="IP地址" width="140" />
+      <el-table-column prop="collectIntervalSec" label="采集间隔(s)" width="110" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status)">
@@ -141,6 +142,14 @@
         <el-form-item label="IP地址" prop="ipAddress">
           <el-input v-model="form.ipAddress" placeholder="请输入IP地址" />
         </el-form-item>
+        <el-form-item label="采集间隔(s)" prop="collectIntervalSec">
+          <el-input-number
+            v-model="form.collectIntervalSec"
+            :min="10"
+            :max="3600"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -184,6 +193,7 @@ const form = reactive({
   type: 'BC-U101',
   mqttClientId: '',
   ipAddress: '',
+  collectIntervalSec: 600,
   description: ''
 })
 
@@ -292,6 +302,7 @@ function openDialog(row?: any) {
     form.type = row.type ?? 'BC-U101'
     form.mqttClientId = row.mqttClientId ?? ''
     form.ipAddress = row.ipAddress ?? ''
+    form.collectIntervalSec = row.collectIntervalSec ?? 600
     form.description = row.description ?? ''
   }
   dialogVisible.value = true
@@ -305,6 +316,7 @@ function resetForm() {
   form.type = 'BC-U101'
   form.mqttClientId = ''
   form.ipAddress = ''
+  form.collectIntervalSec = 600
   form.description = ''
 }
 
@@ -319,6 +331,7 @@ async function handleSubmit() {
       type: form.type,
       mqttClientId: form.mqttClientId,
       ipAddress: form.ipAddress,
+      collectIntervalSec: form.collectIntervalSec,
       description: form.description
     }
     if (isEdit.value && form.id) {

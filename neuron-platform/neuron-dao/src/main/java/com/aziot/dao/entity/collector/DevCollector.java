@@ -26,6 +26,8 @@ public class DevCollector {
 
     private String ipAddress;
 
+    private Integer collectIntervalSec;
+
     private String status;
 
     private String firmwareVersion;
