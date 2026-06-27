@@ -1,132 +1,201 @@
 <template>
   <div class="detail-page" v-loading="loading">
     <!-- 设备头部信息 -->
-    <div class="detail-header">
-      <div class="header-main">
-        <h2 class="header-name">{{ device?.name }}</h2>
-        <span class="header-info">{{ device?.code }} &middot; {{ device?.modelName }} &middot; {{ device?.protocolName }}</span>
-        <el-tag :type="statusType" size="small">{{ statusText }}</el-tag>
+    <div class="detail-hero">
+      <div class="hero-top">
+        <div class="hero-info">
+          <h1 class="hero-name">{{ device?.name }}</h1>
+          <div class="hero-meta">
+            <span class="meta-item">
+              <svg viewBox="0 0 14 14" fill="none" class="meta-icon"><rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/></svg>
+              {{ device?.code }}
+            </span>
+            <span class="meta-sep">·</span>
+            <span class="meta-item">{{ device?.modelName }}</span>
+            <span class="meta-sep">·</span>
+            <span class="meta-item">{{ device?.protocolName }}</span>
+          </div>
+        </div>
+        <div class="hero-status">
+          <span :class="['status-pill', device?.status]">
+            <span class="pill-dot"></span>
+            {{ statusText }}
+          </span>
+        </div>
+      </div>
+      <div class="hero-stats" v-if="device">
+        <div class="stat-item">
+          <span class="stat-label">采集器</span>
+          <span class="stat-value">{{ device.collectorName }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">串口</span>
+          <span class="stat-value">{{ device.serialPortName }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">从站地址</span>
+          <span class="stat-value">{{ device.slaveAddr }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">采集间隔</span>
+          <span class="stat-value">{{ device.collectIntervalSec ?? '-' }}s</span>
+        </div>
       </div>
     </div>
 
-    <!-- 点表驱动渲染器 -->
-    <div class="readings-grid">
-      <div v-for="item in readings" :key="item.sensorCode" class="reading-card">
-        <!-- 数值类型 → 数值卡片 -->
-        <template v-if="isNumeric(item.dataType)">
-          <p class="card-label">{{ item.sensorName || item.sensorCode }}</p>
-          <p class="card-value">
-            {{ formatValue(item.value) }}
-            <span v-if="item.unit" class="card-unit">{{ item.unit }}</span>
-          </p>
-          <span class="card-trend" @click="openTrend(item)">趋势</span>
-        </template>
+    <!-- 实时读数卡片网格 -->
+    <div class="content-block" v-if="readings.length > 0">
+      <h3 class="section-heading">实时采集数据</h3>
+      <div class="readings-grid">
+        <div v-for="item in readings" :key="item.sensorCode" class="reading-card">
+          <!-- 数值类型 → 数值卡片 -->
+          <template v-if="isNumeric(item.dataType)">
+            <div class="rc-header">
+              <span class="rc-label">{{ item.sensorName || item.sensorCode }}</span>
+              <button class="rc-action" @click="openTrend(item)" title="查看趋势">趋势</button>
+            </div>
+            <div class="rc-body">
+              <span class="rc-value">
+                {{ formatValue(item.value) }}
+              </span>
+              <span v-if="item.unit" class="rc-unit">{{ item.unit }}</span>
+            </div>
+            <div class="rc-footer">
+              <span :class="['quality-dot', item.quality === 'good' ? 'good' : 'bad']"></span>
+              <span class="quality-text">{{ item.quality === 'good' ? '数据正常' : '数据异常' }}</span>
+            </div>
+          </template>
 
-        <!-- bool 类型 → 状态灯 -->
-        <template v-else-if="item.dataType === 'bool'">
-          <div :class="['status-dot', item.value > 0 ? 'on' : 'off']"></div>
-          <p class="card-label">{{ item.sensorName || item.sensorCode }}</p>
-          <p :class="['status-text', item.value > 0 ? 'on' : 'off']">
-            {{ item.value > 0 ? 'ON' : 'OFF' }}
-          </p>
-          <!-- bool + RW → 控制开关 -->
-          <div v-if="isWritable(item)" class="switch-row">
-            <el-switch
-              :model-value="item.value > 0"
-              size="small"
-              @change="(val: boolean) => handleSwitch(item, val)"
-            />
-          </div>
-        </template>
+          <!-- bool 类型 → 状态灯 -->
+          <template v-else-if="item.dataType === 'bool'">
+            <div :class="['bool-card', item.value > 0 ? 'on' : 'off']">
+              <div class="bool-dot-wrapper">
+                <div :class="['bool-dot', item.value > 0 ? 'on' : 'off']"></div>
+              </div>
+              <p class="bool-label">{{ item.sensorName || item.sensorCode }}</p>
+              <p :class="['bool-text', item.value > 0 ? 'on' : 'off']">
+                {{ item.value > 0 ? 'ON' : 'OFF' }}
+              </p>
+              <div v-if="isWritable(item)" class="bool-switch">
+                <el-switch
+                  :model-value="item.value > 0"
+                  size="small"
+                  @change="(val: boolean) => handleSwitch(item, val)"
+                />
+              </div>
+            </div>
+          </template>
 
-        <!-- 其他类型默认展示 -->
-        <template v-else>
-          <p class="card-label">{{ item.sensorName || item.sensorCode }}</p>
-          <p class="card-value text-value">{{ item.value ?? '-' }}</p>
-        </template>
+          <!-- 其他类型默认展示 -->
+          <template v-else>
+            <div class="rc-header">
+              <span class="rc-label">{{ item.sensorName || item.sensorCode }}</span>
+            </div>
+            <div class="rc-body">
+              <span class="rc-value text-value">{{ item.value ?? '-' }}</span>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
 
     <!-- 空状态 -->
-    <el-empty v-if="!loading && readings.length === 0" description="暂无采集数据" />
+    <div v-if="!loading && readings.length === 0" class="content-block">
+      <div class="empty-state">
+        <svg viewBox="0 0 48 48" fill="none" class="empty-icon">
+          <rect x="6" y="8" width="36" height="32" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M18 22l4 4 8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>暂无采集数据，请检查设备连接</p>
+      </div>
+    </div>
 
     <!-- 告警阈值设置 -->
-    <div class="alarm-section">
-      <h3 style="font-size:14px;font-weight:500;margin-bottom:12px;">告警阈值设置</h3>
+    <div class="content-block">
+      <div class="block-header">
+        <h3 class="section-heading">告警阈值设置</h3>
+        <el-button type="primary" size="small" @click="addAlarmDialog = true">
+          <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px;margin-right:4px;">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          添加告警规则
+        </el-button>
+      </div>
 
-      <!-- 新增告警按钮 -->
-      <el-button type="primary" size="small" @click="addAlarmDialog = true" style="margin-bottom:12px">+ 添加告警规则</el-button>
-
-      <!-- 已有告警列表 -->
       <el-table :data="alarmConfigs" size="small" v-if="alarmConfigs.length > 0">
         <el-table-column prop="sensorCode" label="采集点" width="160"/>
-        <el-table-column prop="alarmType" label="告警类型" width="120">
+        <el-table-column prop="alarmType" label="告警类型" width="110">
           <template #default="{row}">{{ alarmTypeLabels[row.alarmType] || row.alarmType }}</template>
         </el-table-column>
         <el-table-column label="参数" min-width="200">
           <template #default="{row}">{{ formatAlarmParams(row.alarmType, row.params) }}</template>
         </el-table-column>
-        <el-table-column prop="alarmLevel" label="等级" width="80">
+        <el-table-column prop="alarmLevel" label="等级" width="80" align="center">
           <template #default="{row}">
-            <el-tag :type="row.alarmLevel==='critical'?'danger':row.alarmLevel==='warning'?'warning':'info'" size="small">{{ row.alarmLevel }}</el-tag>
+            <span :class="['level-badge', row.alarmLevel]">
+              {{ row.alarmLevel === 'critical' ? '严重' : row.alarmLevel === 'warning' ? '警告' : '提示' }}
+            </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" width="120" align="center">
           <template #default="{row}">
-            <el-button size="small" text type="primary" @click="editAlarm(row)">编辑</el-button>
-            <el-button size="small" text type="danger" @click="deleteAlarm(row)">删除</el-button>
+            <el-button size="small" link type="primary" @click="editAlarm(row)">编辑</el-button>
+            <el-button size="small" link type="danger" @click="deleteAlarm(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-else description="暂无告警规则" :image-size="60"/>
+      <div class="empty-state" v-else>
+        <p style="font-size:13px;color:var(--color-gray-400)">暂无告警规则，点击上方按钮添加</p>
+      </div>
 
       <!-- 添加/编辑告警弹窗 -->
       <el-dialog :title="editingAlarm ? '编辑告警规则' : '添加告警规则'" v-model="addAlarmDialog" width="500px" @closed="resetAlarmForm">
         <el-form :model="alarmForm" label-width="100px" size="small">
           <el-form-item label="采集点">
-            <el-select v-model="alarmForm.sensorCode" placeholder="选择采集点" :disabled="!!editingAlarm">
+            <el-select v-model="alarmForm.sensorCode" placeholder="选择采集点" :disabled="!!editingAlarm" style="width:100%">
               <el-option v-for="r in readings" :key="r.sensorCode" :label="r.sensorName || r.sensorCode" :value="r.sensorCode"/>
             </el-select>
           </el-form-item>
           <el-form-item label="告警类型">
-            <el-select v-model="alarmForm.alarmType" placeholder="选择告警类型" @change="onAlarmTypeChange">
+            <el-select v-model="alarmForm.alarmType" placeholder="选择告警类型" @change="onAlarmTypeChange" style="width:100%">
               <el-option v-for="item in alarmTypes" :key="item.value" :label="item.label" :value="item.value"/>
             </el-select>
           </el-form-item>
 
-          <!-- 动态参数表单 -->
           <el-form-item label="上限值" v-if="['limit_upper','limit_both'].includes(alarmForm.alarmType)">
-            <el-input-number v-model="alarmForm.params.max" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.max" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="下限值" v-if="['limit_lower','limit_both'].includes(alarmForm.alarmType)">
-            <el-input-number v-model="alarmForm.params.min" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.min" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="回滞值" v-if="['limit_upper','limit_lower','limit_both','deviation'].includes(alarmForm.alarmType)">
-            <el-input-number v-model="alarmForm.params.hysteresis" :min="0" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.hysteresis" :min="0" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="连续次数" v-if="['limit_upper','limit_lower','limit_both','deviation'].includes(alarmForm.alarmType)">
-            <el-input-number v-model="alarmForm.params.delayCount" :min="1" :max="10" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.delayCount" :min="1" :max="10" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="变化率" v-if="['rate_rise','rate_fall'].includes(alarmForm.alarmType)">
-            <el-input-number v-model="alarmForm.params.rate" :min="0" controls-position="right" placeholder="单位/秒"/>
-            <span style="font-size:12px;color:#888;margin-left:8px;">时间窗口</span>
-            <el-input-number v-model="alarmForm.params.windowSec" :min="10" :max="3600" controls-position="right" style="width:120px;margin-left:4px"/> 秒
+            <div style="display:flex;gap:8px;align-items:center">
+              <el-input-number v-model="alarmForm.params.rate" :min="0" controls-position="right" placeholder="单位/秒"/>
+              <span style="font-size:12px;color:var(--color-gray-500);flex-shrink:0">时间窗口</span>
+              <el-input-number v-model="alarmForm.params.windowSec" :min="10" :max="3600" controls-position="right" style="width:100px"/> s
+            </div>
           </el-form-item>
           <el-form-item label="额定值" v-if="alarmForm.alarmType === 'deviation'">
-            <el-input-number v-model="alarmForm.params.expected" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.expected" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="偏差%" v-if="alarmForm.alarmType === 'deviation'">
-            <el-input-number v-model="alarmForm.params.percent" :min="1" :max="100" controls-position="right"/>
+            <el-input-number v-model="alarmForm.params.percent" :min="1" :max="100" controls-position="right" style="width:100%"/>
           </el-form-item>
           <el-form-item label="触发值" v-if="alarmForm.alarmType === 'di_change'">
             <el-switch v-model="alarmForm.params.triggerOn" :active-value="1" :inactive-value="0" active-text="0→1告警" inactive-text="1→0告警"/>
           </el-form-item>
-          <el-form-item label="超时时间(秒)" v-if="alarmForm.alarmType === 'timeout'">
-            <el-input-number v-model="alarmForm.params.timeoutSec" :min="5" :max="3600" controls-position="right"/>
+          <el-form-item label="超时(s)" v-if="alarmForm.alarmType === 'timeout'">
+            <el-input-number v-model="alarmForm.params.timeoutSec" :min="5" :max="3600" controls-position="right" style="width:100%"/>
           </el-form-item>
 
           <el-form-item label="告警等级">
-            <el-select v-model="alarmForm.alarmLevel">
+            <el-select v-model="alarmForm.alarmLevel" style="width:100%">
               <el-option label="提示" value="info"/>
               <el-option label="警告" value="warning"/>
               <el-option label="严重" value="critical"/>
@@ -141,34 +210,43 @@
     </div>
 
     <!-- 设备指令管理 -->
-    <div class="instruction-section">
-      <h3 style="font-size:14px;font-weight:500;margin-bottom:12px;">设备指令管理</h3>
-      <el-button type="primary" size="small" @click="openInstrDialog()" style="margin-bottom:12px">+ 添加指令</el-button>
+    <div class="content-block">
+      <div class="block-header">
+        <h3 class="section-heading">设备指令管理</h3>
+        <el-button type="primary" size="small" @click="openInstrDialog()">
+          <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px;margin-right:4px;">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          添加指令
+        </el-button>
+      </div>
 
       <el-table :data="instructions" size="small" v-if="instructions.length > 0">
         <el-table-column prop="instructionCode" label="指令编码" width="140"/>
         <el-table-column prop="instructionName" label="指令名称" width="150"/>
-        <el-table-column prop="instructionType" label="类型" width="90">
+        <el-table-column prop="instructionType" label="类型" width="90" align="center">
           <template #default="{row}">
-            <el-tag size="small" :type="instrTypeTag(row.instructionType)">{{ instrTypeLabel(row.instructionType) }}</el-tag>
+            <span :class="['instr-type', row.instructionType]">{{ instrTypeLabel(row.instructionType) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="funcCode" label="功能码" width="80"/>
-        <el-table-column label="寄存器地址" width="120">
+        <el-table-column prop="funcCode" label="功能码" width="80" align="center"/>
+        <el-table-column label="寄存器地址" width="130" align="center">
           <template #default="{row}">
-            0x{{ row.registerAddress?.toString(16)?.toUpperCase() }} ({{ row.registerAddress }})
+            <code class="addr-code">0x{{ row.registerAddress?.toString(16)?.toUpperCase() }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="registerCount" label="数量" width="70"/>
-        <el-table-column prop="sortOrder" label="排序" width="70"/>
-        <el-table-column label="操作" width="140">
+        <el-table-column prop="registerCount" label="数量" width="70" align="center"/>
+        <el-table-column prop="sortOrder" label="排序" width="70" align="center"/>
+        <el-table-column label="操作" width="120" align="center">
           <template #default="{row}">
-            <el-button size="small" text type="primary" @click="openInstrDialog(row)">编辑</el-button>
-            <el-button size="small" text type="danger" @click="deleteInstruction(row)">删除</el-button>
+            <el-button size="small" link type="primary" @click="openInstrDialog(row)">编辑</el-button>
+            <el-button size="small" link type="danger" @click="deleteInstruction(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-else description="暂无配置指令" :image-size="60"/>
+      <div class="empty-state" v-else>
+        <p style="font-size:13px;color:var(--color-gray-400)">暂无配置指令</p>
+      </div>
 
       <!-- 指令弹窗 -->
       <el-dialog :title="editingInstr ? '编辑指令' : '添加指令'" v-model="instrDialogVisible" width="560px" @closed="resetInstrForm">
@@ -189,14 +267,7 @@
           </el-form-item>
           <el-form-item label="功能码">
             <el-select v-model="instrForm.funcCode" style="width:100%">
-              <el-option label="0x01 - 读线圈" value="0x01"/>
-              <el-option label="0x02 - 读离散输入" value="0x02"/>
-              <el-option label="0x03 - 读保持寄存器" value="0x03"/>
-              <el-option label="0x04 - 读输入寄存器" value="0x04"/>
-              <el-option label="0x05 - 写单线圈" value="0x05"/>
-              <el-option label="0x06 - 写单寄存器" value="0x06"/>
-              <el-option label="0x0F - 写多线圈" value="0x0F"/>
-              <el-option label="0x10 - 写多寄存器" value="0x10"/>
+              <el-option v-for="fc in funcCodes" :key="fc.value" :label="fc.label" :value="fc.value"/>
             </el-select>
           </el-form-item>
           <el-row :gutter="12">
@@ -246,30 +317,13 @@ const loading = ref(false)
 const device = ref<any>(null)
 const readings = ref<any[]>([])
 
-const statusType = computed(() => {
-  const s = device.value?.status
-  if (s === 'online') return 'success'
-  if (s === 'offline') return 'info'
-  if (s === 'alarm') return 'danger'
-  if (s === 'disabled') return 'warning'
-  return 'info'
-})
-
 const statusText = computed(() => {
-  const map: Record<string, string> = {
-    online: '在线',
-    offline: '离线',
-    alarm: '告警',
-    disabled: '已禁用'
-  }
+  const map: Record<string, string> = { online: '在线', offline: '离线', alarm: '告警', disabled: '已禁用' }
   return map[device.value?.status] ?? device.value?.status ?? '-'
 })
 
-const isNumeric = (type: string) =>
-  ['float32', 'float64', 'uint16', 'int16', 'uint32', 'int32'].includes(type)
-
-const isWritable = (item: any) =>
-  item.dataType === 'bool' && (item.access === 'RW' || item.permission === 'RW')
+const isNumeric = (type: string) => ['float32', 'float64', 'uint16', 'int16', 'uint32', 'int32'].includes(type)
+const isWritable = (item: any) => item.dataType === 'bool' && (item.access === 'RW' || item.permission === 'RW')
 
 const formatValue = (v: number) => {
   if (v == null) return '-'
@@ -296,16 +350,11 @@ const alarmForm = reactive({
 })
 
 const alarmTypes = [
-  { label: '上限告警', value: 'limit_upper' },
-  { label: '下限告警', value: 'limit_lower' },
-  { label: '上下限告警', value: 'limit_both' },
-  { label: '升速率告警', value: 'rate_rise' },
-  { label: '降速率告警', value: 'rate_fall' },
-  { label: '偏差告警', value: 'deviation' },
-  { label: 'DI跳变告警', value: 'di_change' },
-  { label: '通信超时告警', value: 'timeout' },
-  { label: '死区告警', value: 'deadband' },
-  { label: '自定义', value: 'custom' }
+  { label: '上限告警', value: 'limit_upper' }, { label: '下限告警', value: 'limit_lower' },
+  { label: '上下限告警', value: 'limit_both' }, { label: '升速率告警', value: 'rate_rise' },
+  { label: '降速率告警', value: 'rate_fall' }, { label: '偏差告警', value: 'deviation' },
+  { label: 'DI跳变告警', value: 'di_change' }, { label: '通信超时告警', value: 'timeout' },
+  { label: '死区告警', value: 'deadband' }, { label: '自定义', value: 'custom' }
 ]
 
 const alarmTypeLabels: Record<string, string> = {
@@ -314,9 +363,7 @@ const alarmTypeLabels: Record<string, string> = {
   di_change: 'DI跳变', timeout: '超时', deadband: '死区', custom: '自定义'
 }
 
-const onAlarmTypeChange = () => {
-  alarmForm.params = {}
-}
+const onAlarmTypeChange = () => { alarmForm.params = {} }
 
 const formatAlarmParams = (type: string, params: any) => {
   if (!params) return '-'
@@ -377,9 +424,7 @@ const saveAlarm = async () => {
     await loadAlarmConfig()
   } catch(e) {
     ElMessage.error('保存失败')
-  } finally {
-    savingAlarm.value = false
-  }
+  } finally { savingAlarm.value = false }
 }
 
 const deleteAlarm = async (row: any) => {
@@ -391,29 +436,22 @@ const deleteAlarm = async (row: any) => {
   } catch(e) {}
 }
 
-// ─── 设备指令管理 ───
+// ─── 设备指令 ───
 const instructions = ref<any[]>([])
 const instrDialogVisible = ref(false)
 const savingInstr = ref(false)
 const editingInstr = ref<any>(null)
 const instrForm = reactive({
-  instructionCode: '',
-  instructionName: '',
-  instructionType: 'READ',
-  funcCode: '0x03',
-  registerAddress: 0,
-  registerCount: 1,
-  params: '',
-  sortOrder: 0,
-  description: ''
+  instructionCode: '', instructionName: '', instructionType: 'READ', funcCode: '0x03',
+  registerAddress: 0, registerCount: 1, params: '', sortOrder: 0, description: ''
 })
 
-const instrTypeTag = (t: string): '' | 'success' | 'info' | 'warning' | 'danger' => {
-  const map: Record<string, '' | 'success' | 'info' | 'warning' | 'danger'> = {
-    READ: '', WRITE: 'warning', CONTROL: 'danger', CONFIG: 'info'
-  }
-  return map[t] ?? ''
-}
+const funcCodes = [
+  { label: '0x01 - 读线圈', value: '0x01' }, { label: '0x02 - 读离散输入', value: '0x02' },
+  { label: '0x03 - 读保持寄存器', value: '0x03' }, { label: '0x04 - 读输入寄存器', value: '0x04' },
+  { label: '0x05 - 写单线圈', value: '0x05' }, { label: '0x06 - 写单寄存器', value: '0x06' },
+  { label: '0x0F - 写多线圈', value: '0x0F' }, { label: '0x10 - 写多寄存器', value: '0x10' }
+]
 
 const instrTypeLabel = (t: string) => {
   const map: Record<string, string> = { READ: '读取', WRITE: '写入', CONTROL: '控制', CONFIG: '配置' }
@@ -421,54 +459,36 @@ const instrTypeLabel = (t: string) => {
 }
 
 const loadInstructions = async () => {
-  try {
-    const res: any = await instructionApi.list(deviceId)
-    instructions.value = res?.data ?? []
-  } catch { instructions.value = [] }
+  try { const res: any = await instructionApi.list(deviceId); instructions.value = res?.data ?? [] }
+  catch { instructions.value = [] }
 }
 
 const openInstrDialog = (row?: any) => {
   editingInstr.value = row ?? null
   if (row) {
-    instrForm.instructionCode = row.instructionCode
-    instrForm.instructionName = row.instructionName
-    instrForm.instructionType = row.instructionType ?? 'READ'
-    instrForm.funcCode = row.funcCode ?? '0x03'
-    instrForm.registerAddress = row.registerAddress ?? 0
-    instrForm.registerCount = row.registerCount ?? 1
-    instrForm.params = row.params ?? ''
-    instrForm.sortOrder = row.sortOrder ?? 0
+    instrForm.instructionCode = row.instructionCode; instrForm.instructionName = row.instructionName
+    instrForm.instructionType = row.instructionType ?? 'READ'; instrForm.funcCode = row.funcCode ?? '0x03'
+    instrForm.registerAddress = row.registerAddress ?? 0; instrForm.registerCount = row.registerCount ?? 1
+    instrForm.params = row.params ?? ''; instrForm.sortOrder = row.sortOrder ?? 0
     instrForm.description = row.description ?? ''
   }
   instrDialogVisible.value = true
 }
 
 const resetInstrForm = () => {
-  editingInstr.value = null
-  instrForm.instructionCode = ''
-  instrForm.instructionName = ''
-  instrForm.instructionType = 'READ'
-  instrForm.funcCode = '0x03'
-  instrForm.registerAddress = 0
-  instrForm.registerCount = 1
-  instrForm.params = ''
-  instrForm.sortOrder = 0
-  instrForm.description = ''
+  editingInstr.value = null; instrForm.instructionCode = ''; instrForm.instructionName = ''
+  instrForm.instructionType = 'READ'; instrForm.funcCode = '0x03'; instrForm.registerAddress = 0
+  instrForm.registerCount = 1; instrForm.params = ''; instrForm.sortOrder = 0; instrForm.description = ''
 }
 
 const saveInstruction = async () => {
   savingInstr.value = true
   try {
     const payload = {
-      instructionCode: instrForm.instructionCode,
-      instructionName: instrForm.instructionName,
-      instructionType: instrForm.instructionType,
-      funcCode: instrForm.funcCode,
-      registerAddress: instrForm.registerAddress,
-      registerCount: instrForm.registerCount,
-      params: instrForm.params || undefined,
-      sortOrder: instrForm.sortOrder,
-      description: instrForm.description
+      instructionCode: instrForm.instructionCode, instructionName: instrForm.instructionName,
+      instructionType: instrForm.instructionType, funcCode: instrForm.funcCode,
+      registerAddress: instrForm.registerAddress, registerCount: instrForm.registerCount,
+      params: instrForm.params || undefined, sortOrder: instrForm.sortOrder, description: instrForm.description
     }
     if (editingInstr.value) {
       await instructionApi.update(deviceId, editingInstr.value.id, payload)
@@ -484,27 +504,22 @@ const saveInstruction = async () => {
 
 const deleteInstruction = async (row: any) => {
   await ElMessageBox.confirm('确认删除此指令?', '删除确认', { type: 'warning' })
-  try {
-    await instructionApi.remove(deviceId, row.id)
-    ElMessage.success('已删除')
-    await loadInstructions()
-  } catch {}
+  try { await instructionApi.remove(deviceId, row.id); ElMessage.success('已删除'); await loadInstructions() }
+  catch {}
 }
 
 onMounted(async () => {
   loading.value = true
   try {
     const [deviceRes, readingsRes]: [any, any] = await Promise.all([
-      deviceApi.getById(deviceId),
-      readingApi.latest(deviceId)
+      deviceApi.getById(deviceId), readingApi.latest(deviceId)
     ])
     device.value = deviceRes?.data ?? {}
     readings.value = readingsRes?.data ?? []
     await loadAlarmConfig()
     await loadInstructions()
   } catch {
-    device.value = null
-    readings.value = []
+    device.value = null; readings.value = []
   } finally {
     loading.value = false
   }
@@ -513,134 +528,353 @@ onMounted(async () => {
 
 <style scoped>
 .detail-page {
-  padding: 0;
+  animation: page-in 400ms var(--ease-out-expo);
 }
 
-.detail-header {
-  background: #fff;
-  border: 0.5px solid #eee;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.header-main {
+/* ═══ Hero Header ═══ */
+.detail-hero {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: var(--space-4);
+}
+
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.hero-name {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-800);
+  margin: 0 0 var(--space-2);
+}
+
+.hero-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
 }
 
-.header-name {
-  font-size: 18px;
-  font-weight: 600;
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.meta-sep {
+  color: var(--color-gray-300);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.status-pill.online {
+  background: var(--color-success-50);
+  color: var(--color-success-600);
+}
+
+.status-pill.offline {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+.status-pill.alarm {
+  background: var(--color-danger-50);
+  color: var(--color-danger-600);
+}
+
+.status-pill.disabled {
+  background: var(--color-warning-50);
+  color: var(--color-warning-600);
+}
+
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill.online .pill-dot { box-shadow: 0 0 4px var(--color-success-400); }
+.status-pill.alarm .pill-dot { animation: dot-pulse 1.5s ease-in-out infinite; }
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-light);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--color-gray-400);
+  font-weight: var(--font-weight-medium);
+}
+
+.stat-value {
+  font-size: var(--text-sm);
+  color: var(--color-gray-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ═══ Block Header ═══ */
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.block-header .section-heading {
   margin: 0;
-  color: #333;
 }
 
-.header-info {
-  font-size: 13px;
-  color: #888;
-}
-
+/* ═══ Reading Cards Grid ═══ */
 .readings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .reading-card {
-  background: #fff;
-  border-radius: 8px;
-  border: 0.5px solid #eee;
-  padding: 16px;
-  position: relative;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: all var(--duration-normal) var(--ease-out-quart);
 }
 
-.card-label {
-  font-size: 12px;
-  color: #888;
-  margin: 0;
+.reading-card:hover {
+  border-color: var(--color-brand-300);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
-.card-value {
-  font-size: 24px;
-  font-weight: 500;
-  margin: 6px 0 0;
-  color: #333;
+.rc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
 }
 
-.card-value.text-value {
-  font-size: 16px;
-  color: #666;
-}
-
-.card-unit {
-  font-size: 13px;
-  font-weight: 400;
-  color: #888;
-}
-
-.card-trend {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+.rc-label {
   font-size: 11px;
-  color: #ccc;
+  color: var(--color-gray-500);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rc-action {
+  font-size: 11px;
+  color: var(--color-gray-400);
+  background: none;
+  border: none;
   cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  transition: all var(--duration-fast) var(--ease-out-quart);
 }
 
-.card-trend:hover {
-  color: #534AB7;
+.rc-action:hover {
+  color: var(--color-brand-500);
+  background: var(--color-brand-50);
 }
 
-.status-dot {
-  width: 28px;
-  height: 28px;
+.rc-body {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+}
+
+.rc-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-800);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.rc-value.text-value {
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  color: var(--color-gray-600);
+}
+
+.rc-unit {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+  font-weight: var(--font-weight-medium);
+}
+
+.rc-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quality-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  margin: 0 auto 8px;
 }
 
-.status-dot.on {
-  background: #1D9E75;
+.quality-dot.good { background: var(--color-success-500); }
+.quality-dot.bad { background: var(--color-danger-500); }
+
+.quality-text {
+  font-size: 10px;
+  color: var(--color-gray-400);
+  font-weight: var(--font-weight-medium);
 }
 
-.status-dot.off {
-  background: #888;
-}
-
-.status-text {
+/* ═══ Bool Cards ═══ */
+.bool-card {
   text-align: center;
+  padding: var(--space-2) 0;
+}
+
+.bool-dot-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-2);
+}
+
+.bool-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: all var(--duration-normal) var(--ease-out-quart);
+}
+
+.bool-dot.on {
+  background: var(--color-success-500);
+  box-shadow: 0 0 12px var(--color-success-400);
+}
+
+.bool-dot.off {
+  background: var(--color-gray-300);
+}
+
+.bool-label {
+  font-size: 11px;
+  color: var(--color-gray-500);
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.bool-text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  margin: 4px 0;
+}
+
+.bool-text.on { color: var(--color-success-600); }
+.bool-text.off { color: var(--color-gray-500); }
+
+.bool-switch {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+/* ═══ Level Badge ═══ */
+.level-badge {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+}
+
+.level-badge.critical { color: var(--color-danger-600); background: var(--color-danger-50); }
+.level-badge.warning { color: var(--color-warning-600); background: var(--color-warning-50); }
+.level-badge.info { color: var(--color-info-600); background: var(--color-info-50); }
+
+/* ═══ Instruction Type Tags ═══ */
+.instr-type {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.instr-type.READ { color: var(--color-info-600); background: var(--color-info-50); }
+.instr-type.WRITE { color: var(--color-warning-600); background: var(--color-warning-50); }
+.instr-type.CONTROL { color: var(--color-danger-600); background: var(--color-danger-50); }
+.instr-type.CONFIG { color: var(--color-brand-600); background: var(--color-brand-50); }
+
+/* ═══ Address Code ═══ */
+.addr-code {
+  font-family: var(--font-mono);
   font-size: 12px;
-  margin: 4px 0 0;
+  color: var(--color-brand-600);
+  background: var(--color-brand-50);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
 }
 
-.status-text.on {
-  color: #0F6E56;
+/* ═══ Empty State ═══ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-8) 0;
 }
 
-.status-text.off {
-  color: #888;
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-3);
+  color: var(--color-gray-300);
 }
 
-.switch-row {
-  text-align: center;
-  margin-top: 8px;
-}
+/* ═══ Responsive ═══ */
+@media (max-width: 768px) {
+  .hero-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-.alarm-section {
-  background: #fff;
-  border: 0.5px solid #eee;
-  border-radius: 8px;
-  padding: 20px;
-  margin-top: 16px;
-}
-
-.instruction-section {
-  background: #fff;
-  border: 0.5px solid #eee;
-  border-radius: 8px;
-  padding: 20px;
-  margin-top: 16px;
+  .readings-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
 }
 </style>

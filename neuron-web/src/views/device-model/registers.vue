@@ -1,24 +1,24 @@
 <template>
-  <div class="registers-page">
-    <div class="page-header">
-      <div class="header-left">
-        <el-button @click="goBack">返回型号管理</el-button>
-        <span class="page-title">点表管理 - {{ modelName }}</span>
+  <div class="registers-page page-container">
+    <div class="page-toolbar">
+      <div class="filter-group">
+        <el-button @click="goBack" size="default" plain>
+          <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px;margin-right:4px;">
+            <path d="M10 13L5 8l5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          返回型号管理
+        </el-button>
+        <span class="page-heading">点表管理 — {{ modelName }}</span>
       </div>
-      <div class="header-right">
-        <el-upload
-          :auto-upload="false"
-          :show-file-list="false"
-          accept=".json,.csv"
-          @change="handleImportFile"
-        >
+      <div class="filter-group">
+        <el-upload :auto-upload="false" :show-file-list="false" accept=".json,.csv" @change="handleImportFile">
           <el-button>批量导入</el-button>
         </el-upload>
         <el-button type="primary" @click="openDialog()">新增点位</el-button>
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="tableData" border stripe>
+    <el-table v-loading="loading" :data="tableData" stripe>
       <el-table-column prop="sensorCode" label="传感器编码" min-width="130" />
       <el-table-column prop="sensorName" label="传感器名称" min-width="150" />
       <el-table-column label="寄存器地址" min-width="140">
@@ -289,30 +289,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.registers-page {
-  padding: 0;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.page-title {
-  font-size: 16px;
-  font-weight: 500;
+.page-heading {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
 }
 .register-address {
   display: flex;
@@ -320,7 +300,8 @@ onMounted(() => {
   gap: 6px;
 }
 .addr-dec {
-  color: #909399;
-  font-size: 12px;
+  color: var(--color-gray-500);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
 }
 </style>
