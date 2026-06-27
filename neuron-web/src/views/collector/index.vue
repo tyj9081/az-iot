@@ -42,10 +42,10 @@
               <el-table-column label="启用" width="80" align="center">
                 <template #default="{ row: port }">
                   <template v-if="port._editing">
-                    <el-switch v-model="port._isActive" size="small" />
+                    <el-switch v-model="port._isActive" :active-value="1" :inactive-value="0" size="small" />
                   </template>
                   <template v-else>
-                    <el-switch :model-value="port.isActive" disabled size="small" />
+                    <el-switch :model-value="port.isActive" :active-value="1" :inactive-value="0" disabled size="small" />
                   </template>
                 </template>
               </el-table-column>
@@ -163,17 +163,17 @@ async function handleExpandChange(row: any, expandedRows: any[]) {
   if (expandedRows.some((r: any) => r.id === row.id)) {
     try {
       const res: any = await collectorApi.getSerialPorts(row.id)
-      row.serialPorts = (res.data ?? []).map((p: any) => ({ ...p, _editing: false, _portLabel: p.portLabel ?? '', _busParam: p.busParam ?? '', _isActive: p.isActive ?? false }))
+      row.serialPorts = (res.data ?? []).map((p: any) => ({ ...p, _editing: false, _portLabel: p.portLabel ?? '', _busParam: p.busParam ?? '', _isActive: p.isActive ?? 0 }))
     } catch { row.serialPorts = [] }
   }
 }
 
-function editSerialPort(port: any) { port._editing = true; port._portLabel = port.portLabel ?? ''; port._busParam = port.busParam ?? ''; port._isActive = port.isActive ?? false }
+function editSerialPort(port: any) { port._editing = true; port._portLabel = port.portLabel ?? ''; port._busParam = port.busParam ?? ''; port._isActive = port.isActive ?? 0 }
 function cancelEditPort(port: any) { port._editing = false }
 
 async function saveSerialPort(collector: any, port: any) {
   try {
-    await collectorApi.updateSerialPort(collector.id, port.id, { portLabel: port._portLabel, busParam: port._busParam, isActive: port._isActive })
+    await collectorApi.updateSerialPort(collector.id, port.id, { portLabel: port._portLabel, busParam: port._busParam, isActive: port._isActive ? 1 : 0 })
     port.portLabel = port._portLabel; port.busParam = port._busParam; port.isActive = port._isActive
     port._editing = false; ElMessage.success('更新成功')
   } catch {}

@@ -23,7 +23,7 @@ public class SerialPortController {
     @PutMapping("/{id}")
     public ApiResponse<DevSerialPort> update(@PathVariable Long collectorId, @PathVariable Long id, @RequestBody DevSerialPort port) {
         port.setId(id);
-        serialPortService.update(id, port);
+        serialPortService.update(collectorId, id, port);
         return ApiResponse.ok(serialPortService.getById(id));
     }
 }

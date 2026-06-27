@@ -28,4 +28,12 @@ public class DevSerialPortService extends ServiceImpl<DevSerialPortMapper, DevSe
         exist.setIsActive(port.getIsActive());
         updateById(exist);
     }
+
+    public void update(Long collectorId, Long id, DevSerialPort port) {
+        DevSerialPort exist = super.getById(id);
+        if (exist == null || !collectorId.equals(exist.getCollectorId())) {
+            throw BusinessException.notFound("串口");
+        }
+        update(id, port);
+    }
 }

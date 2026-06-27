@@ -7,6 +7,8 @@ import com.aziot.service.system.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -41,10 +43,13 @@ public class AuthController {
         String token = auth.substring(7);
         Long userId = jwtTokenProvider.getUserId(token);
         var user = authService.getCurrentUser(userId);
-        return ApiResponse.ok(Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "nickname", user.getNickname()));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", user.getId());
+        result.put("username", user.getUsername());
+        result.put("nickname", user.getNickname());
+        result.put("roles", List.of());
+        result.put("permissions", List.of());
+        return ApiResponse.ok(result);
     }
 
     @PostMapping("/logout")

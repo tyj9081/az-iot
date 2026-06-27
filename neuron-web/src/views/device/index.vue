@@ -37,7 +37,7 @@
       <el-table-column prop="serialPortName" label="串口" width="100" />
       <el-table-column prop="slaveAddr" label="从站地址" width="100" />
       <el-table-column prop="collectIntervalSec" label="采集间隔(s)" width="130">
-        <template #default="{ row }">{{ row.collectInterval ?? '-' }}</template>
+        <template #default="{ row }">{{ row.collectIntervalSec ?? '-' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="90" align="center">
         <template #default="{ row }">

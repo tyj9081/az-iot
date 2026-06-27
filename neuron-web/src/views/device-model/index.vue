@@ -2,10 +2,10 @@
   <div class="device-model-page page-container">
     <div class="page-toolbar">
       <div class="filter-group">
-        <el-select v-model="filterManufacturerId" placeholder="选择厂商" clearable filterable style="width: 180px">
+        <el-select v-model="filterManufacturerId" placeholder="选择厂商" clearable filterable style="width: 180px" @change="handleSearch">
           <el-option v-for="m in manufacturerList" :key="m.id" :label="m.name" :value="m.id" />
         </el-select>
-        <el-select v-model="filterProtocolId" placeholder="选择协议" clearable filterable style="width: 160px">
+        <el-select v-model="filterProtocolId" placeholder="选择协议" clearable filterable style="width: 160px" @change="handleSearch">
           <el-option v-for="p in protocolList" :key="p.id" :label="p.name" :value="p.id" />
         </el-select>
         <el-input v-model="searchKeyword" placeholder="搜索型号编码/名称" clearable style="width: 220px" @keyup.enter="handleSearch">
@@ -107,7 +107,14 @@ async function fetchList() {
 function handleSearch() { page.value = 1; fetchList() }
 function openDialog(row?: any) {
   isEdit.value = !!row
-  if (row) { form.id = row.id; form.manufacturer_id = row.manufacturer_id; form.protocol_id = row.protocol_id; form.code = row.code; form.name = row.name; form.description = row.description ?? '' }
+  if (row) {
+    form.id = row.id
+    form.manufacturer_id = row.manufacturerId ?? row.manufacturer_id ?? null
+    form.protocol_id = row.protocolId ?? row.protocol_id ?? null
+    form.code = row.code
+    form.name = row.name
+    form.description = row.description ?? ''
+  }
   dialogVisible.value = true
 }
 function resetForm() { formRef.value?.resetFields(); form.id = null; form.manufacturer_id = null; form.protocol_id = null; form.code = ''; form.name = ''; form.description = '' }
