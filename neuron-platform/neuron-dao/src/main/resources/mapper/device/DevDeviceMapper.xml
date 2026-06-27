@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aziot.dao.mapper.device.DevDeviceMapper">
+
+    <select id="selectPageByCondition" resultType="com.aziot.dao.entity.device.DevDevice">
+        SELECT * FROM dev_device
+        <where>
+            is_deleted = 0
+            <if test="serialPortId != null">
+                AND serial_port_id = #{serialPortId}
+            </if>
+            <if test="portIds != null and portIds.size() > 0">
+                AND serial_port_id IN
+                <foreach collection="portIds" item="pid" open="(" separator="," close=")">
+                    #{pid}
+                </foreach>
+            </if>
+            <if test="modelId != null">
+                AND model_id = #{modelId}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%')
+                 OR code LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectByCodeExcludeId" resultType="com.aziot.dao.entity.device.DevDevice">
+        SELECT * FROM dev_device
+        WHERE code = #{code} AND id != #{excludeId} AND is_deleted = 0
+    </select>
+
+    <select id="selectByCode" resultType="com.aziot.dao.entity.device.DevDevice">
+        SELECT * FROM dev_device WHERE code = #{code} AND is_deleted = 0
+    </select>
+
+    <select id="countByModelId" resultType="long">
+        SELECT COUNT(*) FROM dev_device WHERE model_id = #{modelId}
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*) FROM dev_device WHERE status = #{status} AND is_deleted = 0
+    </select>
+
+</mapper>

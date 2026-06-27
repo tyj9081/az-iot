@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aziot.dao.mapper.device.DevDeviceModelMapper">
+
+    <select id="selectPageByCondition" resultType="com.aziot.dao.entity.device.DevDeviceModel">
+        SELECT * FROM dev_device_model
+        <where>
+            <if test="manufacturerId != null">
+                AND manufacturer_id = #{manufacturerId}
+            </if>
+            <if test="protocolId != null">
+                AND protocol_id = #{protocolId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%')
+                 OR code LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectByCodeExcludeId" resultType="com.aziot.dao.entity.device.DevDeviceModel">
+        SELECT * FROM dev_device_model
+        WHERE code = #{code} AND id != #{excludeId}
+    </select>
+
+    <select id="selectByCode" resultType="com.aziot.dao.entity.device.DevDeviceModel">
+        SELECT * FROM dev_device_model WHERE code = #{code}
+    </select>
+
+    <select id="countByModelId" resultType="long">
+        SELECT COUNT(*) FROM dev_device WHERE model_id = #{modelId}
+    </select>
+
+</mapper>

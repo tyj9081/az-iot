@@ -1,0 +1,20 @@
+# AZ-IOT Collector 配置文件模板
+# 部署时复制为 config.toml 并填入真实凭据
+# cp config.example.toml config.toml
+
+[mqtt]
+# EMQX MQTT Broker 地址
+broker = "tcp://your-broker:1883"
+# 采集器唯一标识 (多台采集器时不能重复)
+client_id = "collector-001"
+# MQTT 认证凭据 — 切勿提交真实凭据到 Git
+username = "neuron-collector"
+password = "your-mqtt-password-here"
+# MQTT Topic 前缀, 上报到 neuron/{device_id}/reading
+topic_prefix = "neuron"
+
+[fallback]
+# MQTT 断连时的 HTTP 备用上报通道
+ws_url = "http://your-server:8080/api/v1/collector/data"
+# 是否启用备用通道
+enabled = true

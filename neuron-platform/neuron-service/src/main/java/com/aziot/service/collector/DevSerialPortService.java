@@ -3,7 +3,6 @@ package com.aziot.service.collector;
 import com.aziot.common.exception.BusinessException;
 import com.aziot.dao.entity.collector.DevSerialPort;
 import com.aziot.dao.mapper.collector.DevSerialPortMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
@@ -13,9 +12,7 @@ import java.util.List;
 public class DevSerialPortService extends ServiceImpl<DevSerialPortMapper, DevSerialPort> {
 
     public List<DevSerialPort> listByCollectorId(Long collectorId) {
-        return list(new LambdaQueryWrapper<DevSerialPort>()
-                .eq(DevSerialPort::getCollectorId, collectorId)
-                .orderByAsc(DevSerialPort::getId));
+        return baseMapper.selectByCollectorId(collectorId);
     }
 
     public void update(Long id, DevSerialPort port) {

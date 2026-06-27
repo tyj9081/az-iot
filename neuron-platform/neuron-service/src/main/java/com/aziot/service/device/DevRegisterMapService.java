@@ -3,7 +3,6 @@ package com.aziot.service.device;
 import com.aziot.common.exception.BusinessException;
 import com.aziot.dao.entity.device.DevRegisterMap;
 import com.aziot.dao.mapper.device.DevRegisterMapMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +13,7 @@ import java.util.List;
 public class DevRegisterMapService extends ServiceImpl<DevRegisterMapMapper, DevRegisterMap> {
 
     public List<DevRegisterMap> listByModelId(Long modelId) {
-        LambdaQueryWrapper<DevRegisterMap> qw = new LambdaQueryWrapper<>();
-        qw.eq(DevRegisterMap::getModelId, modelId);
-        qw.orderByAsc(DevRegisterMap::getSortOrder);
-        return list(qw);
+        return baseMapper.selectByModelId(modelId);
     }
 
     public DevRegisterMap getById(Long id) {
@@ -40,10 +36,8 @@ public class DevRegisterMapService extends ServiceImpl<DevRegisterMapMapper, Dev
     public void update(Long id, DevRegisterMap register) {
         DevRegisterMap existing = getById(id);
         if (!existing.getSensorCode().equals(register.getSensorCode())) {
-            DevRegisterMap dup = getOne(new LambdaQueryWrapper<DevRegisterMap>()
-                    .eq(DevRegisterMap::getModelId, existing.getModelId())
-                    .eq(DevRegisterMap::getSensorCode, register.getSensorCode())
-                    .ne(DevRegisterMap::getId, id));
+            DevRegisterMap dup = baseMapper.selectByModelIdAndSensorCodeExcludeId(
+                existing.getModelId(), register.getSensorCode(), id);
             if (dup != null) {
                 throw new BusinessException(409, "该型号下传感器编码已存在");
             }
@@ -60,10 +54,7 @@ public class DevRegisterMapService extends ServiceImpl<DevRegisterMapMapper, Dev
 
     @Transactional
     public void batchCreate(Long modelId, List<DevRegisterMap> list) {
-        // 清除旧数据
-        remove(new LambdaQueryWrapper<DevRegisterMap>()
-                .eq(DevRegisterMap::getModelId, modelId));
-        // 批量写入新数据
+        baseMapper.deleteByModelId(modelId);
         for (DevRegisterMap item : list) {
             item.setModelId(modelId);
             save(item);
@@ -71,8 +62,6 @@ public class DevRegisterMapService extends ServiceImpl<DevRegisterMapMapper, Dev
     }
 
     private boolean existsByModelIdAndSensorCode(Long modelId, String sensorCode) {
-        return getOne(new LambdaQueryWrapper<DevRegisterMap>()
-                .eq(DevRegisterMap::getModelId, modelId)
-                .eq(DevRegisterMap::getSensorCode, sensorCode)) != null;
+        return baseMapper.selectByModelIdAndSensorCode(modelId, sensorCode) != null;
     }
 }

@@ -84,16 +84,33 @@ impl Collector {
             };
 
             for device in devices {
-                let Some(driver) = DriverFactory::create(&device) else {
-                    tracing::warn!(
-                        "No driver available for device {} protocol {:?}",
-                        device.id,
-                        device.protocol
-                    );
-                    continue;
+                let driver = match DriverFactory::create(&device) {
+                    Some(d) => d,
+                    None => {
+                        tracing::warn!(
+                            "No driver available for device {} protocol {:?}",
+                            device.id,
+                            device.protocol
+                        );
+                        continue;
+                    }
                 };
 
-                let result = tokio::task::block_in_place(|| driver.collect(&device));
+                // 使用 spawn_blocking 卸到独立线程池, 避免阻塞 tokio worker
+                let device_clone = device.clone();
+                let result = match tokio::task::spawn_blocking(move || {
+                    driver.collect(&device_clone)
+                }).await {
+                    Ok(r) => r,
+                    Err(join_err) => {
+                        tracing::warn!(
+                            "Collect task panicked for device {}: {}",
+                            device_clone.id, join_err
+                        );
+                        continue;
+                    }
+                };
+
                 match result {
                     Ok(values) => {
                         for point in &device.data_points {

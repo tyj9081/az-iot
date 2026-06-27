@@ -38,7 +38,7 @@ public class DeviceController {
     }
 
     @PostMapping
-    public ApiResponse<DevDevice> create(@RequestBody DeviceCreateDTO dto) {
+    public ApiResponse<DevDeviceVO> create(@RequestBody DeviceCreateDTO dto) {
         DevDevice device = new DevDevice();
         device.setSerialPortId(dto.getSerialPortId());
         device.setModelId(dto.getModelId());
@@ -49,7 +49,8 @@ public class DeviceController {
         device.setLocation(dto.getLocation());
         device.setDescription(dto.getDescription());
         deviceService.create(device);
-        return ApiResponse.ok(device);
+        // 返回 VO 而非 Entity, 符合 S03 规范
+        return ApiResponse.ok(deviceService.getById(device.getId()));
     }
 
     @PutMapping("/{id}")

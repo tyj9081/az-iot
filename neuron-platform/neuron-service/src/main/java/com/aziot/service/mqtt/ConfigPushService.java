@@ -6,7 +6,6 @@ import com.aziot.dao.entity.device.*;
 import com.aziot.dao.mapper.collector.DevCollectorMapper;
 import com.aziot.dao.mapper.collector.DevSerialPortMapper;
 import com.aziot.dao.mapper.device.*;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,9 +39,7 @@ public class ConfigPushService {
             if (model == null) return;
             DevProtocol protocol = protocolMapper.selectById(model.getProtocolId());
             if (protocol == null) return;
-            List<DevRegisterMap> registers = registerMapMapper.selectList(
-                new LambdaQueryWrapper<DevRegisterMap>()
-                    .eq(DevRegisterMap::getModelId, device.getModelId()));
+            List<DevRegisterMap> registers = registerMapMapper.selectByModelId(device.getModelId());
 
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("version", System.currentTimeMillis());
@@ -67,7 +64,6 @@ public class ConfigPushService {
                 serial.put("bus_param", objectMapper.readTree(port.getBusParam()));
                 bus.put("serial", serial);
             }
-            deviceNode.put("serial_port", bus);
             deviceNode.put("bus", bus);
 
             List<Map<String, Object>> dps = new ArrayList<>();
@@ -88,11 +84,8 @@ public class ConfigPushService {
             deviceNode.put("data_points", dps);
             deviceNode.put("collect_interval_sec", device.getCollectIntervalSec());
 
-            // 追加告警配置
-            List<DevDeviceAlarmConfig> alarms = alarmConfigMapper.selectList(
-                new LambdaQueryWrapper<DevDeviceAlarmConfig>()
-                    .eq(DevDeviceAlarmConfig::getDeviceId, device.getId())
-                    .eq(DevDeviceAlarmConfig::getAlarmEnabled, 1));
+            List<DevDeviceAlarmConfig> alarms = alarmConfigMapper.selectByDeviceId(device.getId())
+                .stream().filter(a -> a.getAlarmEnabled() == 1).toList();
 
             List<Map<String, Object>> alarmList = new ArrayList<>();
             for (DevDeviceAlarmConfig ac : alarms) {

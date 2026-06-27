@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aziot.dao.mapper.device.DevRegisterMapMapper">
+
+    <select id="selectByModelId" resultType="com.aziot.dao.entity.device.DevRegisterMap">
+        SELECT * FROM dev_register_map
+        WHERE model_id = #{modelId}
+        ORDER BY sort_order ASC
+    </select>
+
+    <select id="selectByModelIdAndSensorCode" resultType="com.aziot.dao.entity.device.DevRegisterMap">
+        SELECT * FROM dev_register_map
+        WHERE model_id = #{modelId} AND sensor_code = #{sensorCode}
+    </select>
+
+    <select id="selectByModelIdAndSensorCodeExcludeId" resultType="com.aziot.dao.entity.device.DevRegisterMap">
+        SELECT * FROM dev_register_map
+        WHERE model_id = #{modelId}
+          AND sensor_code = #{sensorCode}
+          AND id != #{excludeId}
+    </select>
+
+    <delete id="deleteByModelId">
+        DELETE FROM dev_register_map WHERE model_id = #{modelId}
+    </delete>
+
+    <select id="countByModelId" resultType="long">
+        SELECT COUNT(*) FROM dev_register_map WHERE model_id = #{modelId}
+    </select>
+
+    <select id="selectBySensorCode" resultType="com.aziot.dao.entity.device.DevRegisterMap">
+        SELECT * FROM dev_register_map WHERE sensor_code = #{sensorCode}
+    </select>
+
+</mapper>

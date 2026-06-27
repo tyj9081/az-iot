@@ -4,7 +4,6 @@ import com.aziot.common.exception.BusinessException;
 import com.aziot.dao.entity.system.SysUser;
 import com.aziot.dao.mapper.system.SysUserMapper;
 import com.aziot.security.JwtTokenProvider;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,8 +23,7 @@ public class AuthService {
      * 登录失败统一返回 401，不区分"账号不存在"和"密码错误"以防范用户枚举攻击。
      */
     public Map<String, String> login(String username, String password) {
-        SysUser user = userMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+        SysUser user = userMapper.selectByUsername(username);
         if (user == null || !"1".equals(user.getStatus())) {
             throw new BusinessException(401, "用户名或密码错误");
         }

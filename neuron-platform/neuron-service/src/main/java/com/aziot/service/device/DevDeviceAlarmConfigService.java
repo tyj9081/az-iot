@@ -2,7 +2,6 @@ package com.aziot.service.device;
 
 import com.aziot.dao.entity.device.DevDeviceAlarmConfig;
 import com.aziot.dao.mapper.device.DevDeviceAlarmConfigMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,18 +11,14 @@ import java.util.List;
 public class DevDeviceAlarmConfigService extends ServiceImpl<DevDeviceAlarmConfigMapper, DevDeviceAlarmConfig> {
 
     public List<DevDeviceAlarmConfig> listByDeviceId(Long deviceId) {
-        return list(new LambdaQueryWrapper<DevDeviceAlarmConfig>()
-                .eq(DevDeviceAlarmConfig::getDeviceId, deviceId));
+        return baseMapper.selectByDeviceId(deviceId);
     }
 
     @Transactional
     public void saveOrUpdateAlarm(Long deviceId, String sensorCode, DevDeviceAlarmConfig config) {
         config.setDeviceId(deviceId);
         config.setSensorCode(sensorCode);
-        DevDeviceAlarmConfig existing = getOne(new LambdaQueryWrapper<DevDeviceAlarmConfig>()
-                .eq(DevDeviceAlarmConfig::getDeviceId, deviceId)
-                .eq(DevDeviceAlarmConfig::getSensorCode, sensorCode)
-                .eq(DevDeviceAlarmConfig::getAlarmType, config.getAlarmType()));
+        DevDeviceAlarmConfig existing = baseMapper.selectByDeviceSensorType(deviceId, sensorCode, config.getAlarmType());
         if (existing != null) {
             config.setId(existing.getId());
             updateById(config);
@@ -34,8 +29,6 @@ public class DevDeviceAlarmConfigService extends ServiceImpl<DevDeviceAlarmConfi
 
     @Transactional
     public void deleteByDeviceAndSensor(Long deviceId, String sensorCode) {
-        remove(new LambdaQueryWrapper<DevDeviceAlarmConfig>()
-                .eq(DevDeviceAlarmConfig::getDeviceId, deviceId)
-                .eq(DevDeviceAlarmConfig::getSensorCode, sensorCode));
+        baseMapper.deleteByDeviceAndSensor(deviceId, sensorCode);
     }
 }

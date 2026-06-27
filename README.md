@@ -88,15 +88,15 @@ server {
 
 ### 4.2 EMQX MQTT Broker
 
-- **Dashboard**: http://8.163.61.99:18083 (admin / admin123)
+- **Dashboard**: http://8.163.61.99:18083 (admin / ***)
 - **MQTT 端口**: tcp://8.163.61.99:1883
 
 #### MQTT 用户
 
 | 用户名 | 密码 | 权限 |
 |--------|------|------|
-| `neuron-collector` | `collector2024!` | publish `neuron/+/reading`, `neuron/+/status`; subscribe `neuron/+/config/delta` |
-| `neuron-server` | `server2024!` | publish `neuron/+/cmd`; subscribe `neuron/+/reading`, `neuron/+/status` |
+| `neuron-collector` | *** | publish `neuron/+/reading`, `neuron/+/status`; subscribe `neuron/+/config/delta` |
+| `neuron-server` | *** | publish `neuron/+/cmd`; subscribe `neuron/+/reading`, `neuron/+/status` |
 
 #### ACL 规则
 
@@ -117,7 +117,7 @@ java -Xms128m -Xmx200m -XX:+UseSerialGC \
   --spring.profiles.active=dev \
   --app.mqtt.broker-url=tcp://localhost:1883 \
   --app.mqtt.username=neuron-server \
-  --app.mqtt.password=server2024!
+  --app.mqtt.password=${MQTT_PASSWORD}
 ```
 
 **环境变量 (必需)**:
@@ -137,7 +137,7 @@ export JWT_SECRET=***
 broker = "tcp://8.163.61.99:1883"
 client_id = "collector-win10-01"
 username = "neuron-collector"
-password = "collector2024!"
+password = "${MQTT_COLLECTOR_PASSWORD}"
 topic_prefix = "neuron"
 
 [fallback]
@@ -150,7 +150,7 @@ enabled = true
 ## 5. 数据库
 
 - **数据库**: MySQL `neuron_db`
-- **root 密码**: `root`
+- **凭据**: 通过环境变量注入, 切勿硬编码
 - **Flyway 版本**: 自动管理
 
 ### 核心表
@@ -180,7 +180,7 @@ nohup java -Xms128m -Xmx200m -XX:+UseSerialGC \
   --spring.profiles.active=dev \
   --app.mqtt.broker-url=tcp://localhost:1883 \
   --app.mqtt.username=neuron-server \
-  --app.mqtt.password=server2024! \
+  --app.mqtt.password=${MQTT_PASSWORD} \
   > /var/log/neuron-server.log 2>&1 &
 ```
 
@@ -192,14 +192,14 @@ emqx ctl status
 # 查看客户端
 emqx ctl clients list
 # 查看认证用户
-curl -s -u admin:admin123 http://localhost:18083/api/v5/login | ...
+curl -s -u admin:${EMQX_ADMIN_PASSWORD} http://localhost:18083/api/v5/login | ...
 ```
 
 ### 6.3 前端登录
 
 - **地址**: http://8.163.61.99:19090
 - **账号**: admin
-- **密码**: `123%456/789-admin`
+- **密码**: 由管理员在数据库中设置 (BCrypt 哈希)
 
 ---
 

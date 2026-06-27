@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aziot.dao.mapper.device.DevDeviceReadingMapper">
+
+    <select id="selectLatestByDeviceId" resultType="com.aziot.dao.entity.device.DevDeviceReading">
+        SELECT * FROM dev_device_reading
+        WHERE device_id = #{deviceId}
+          AND read_at >= #{sinceTime}
+        ORDER BY read_at DESC
+    </select>
+
+    <select id="selectHistory" resultType="com.aziot.dao.entity.device.DevDeviceReading">
+        SELECT * FROM dev_device_reading
+        WHERE device_id = #{deviceId}
+          AND read_at >= #{fromTime}
+          AND read_at &lt;= #{toTime}
+          <if test="sensorCode != null and sensorCode != ''">
+              AND sensor_code = #{sensorCode}
+          </if>
+        ORDER BY read_at ASC
+    </select>
+
+    <select id="countTodayReadings" resultType="long">
+        SELECT COUNT(*) FROM dev_device_reading
+        WHERE read_at >= #{todayStart}
+    </select>
+
+    <select id="selectRecent20" resultType="com.aziot.dao.entity.device.DevDeviceReading">
+        SELECT * FROM dev_device_reading
+        ORDER BY read_at DESC
+        LIMIT 20
+    </select>
+
+</mapper>

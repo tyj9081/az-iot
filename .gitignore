@@ -36,6 +36,9 @@ Thumbs.db
 .env
 .env.local
 
+# 部署配置文件 (使用 .example.toml 作为模板)
+**/config.toml
+
 # WorkBuddy artifacts
 overview.md
 .workbuddy/

@@ -4,7 +4,6 @@ import com.aziot.dao.entity.device.DevDeviceReading;
 import com.aziot.dao.mapper.device.DevDeviceReadingMapper;
 import com.aziot.dao.mapper.device.DevRegisterMapMapper;
 import com.aziot.dao.entity.device.DevRegisterMap;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -230,9 +229,7 @@ public class MqttSubscriberService {
         DevRegisterMap cached = registerCache.get(sensorCode);
         if (cached != null) return cached.getId();
 
-        DevRegisterMap rm = registerMapMapper.selectOne(
-            new LambdaQueryWrapper<DevRegisterMap>()
-                .eq(DevRegisterMap::getSensorCode, sensorCode));
+        DevRegisterMap rm = registerMapMapper.selectBySensorCode(sensorCode);
         if (rm != null) {
             registerCache.put(sensorCode, rm);
             return rm.getId();

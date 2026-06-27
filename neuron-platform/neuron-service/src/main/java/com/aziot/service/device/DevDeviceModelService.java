@@ -12,7 +12,6 @@ import com.aziot.dao.mapper.device.DevDeviceModelMapper;
 import com.aziot.dao.mapper.device.DevManufacturerMapper;
 import com.aziot.dao.mapper.device.DevProtocolMapper;
 import com.aziot.dao.mapper.device.DevRegisterMapMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -37,19 +36,7 @@ public class DevDeviceModelService extends ServiceImpl<DevDeviceModelMapper, Dev
     }
 
     public Page<DevDeviceModel> page(int page, int pageSize, Long manufacturerId, Long protocolId, String keyword) {
-        LambdaQueryWrapper<DevDeviceModel> qw = new LambdaQueryWrapper<>();
-        if (manufacturerId != null) {
-            qw.eq(DevDeviceModel::getManufacturerId, manufacturerId);
-        }
-        if (protocolId != null) {
-            qw.eq(DevDeviceModel::getProtocolId, protocolId);
-        }
-        if (keyword != null && !keyword.isBlank()) {
-            qw.and(w -> w.like(DevDeviceModel::getName, keyword)
-                    .or().like(DevDeviceModel::getCode, keyword));
-        }
-        qw.orderByAsc(DevDeviceModel::getId);
-        return page(new Page<>(page, pageSize), qw);
+        return baseMapper.selectPageByCondition(new Page<>(page, pageSize), manufacturerId, protocolId, keyword);
     }
 
     public DeviceModelVO getById(Long id) {
@@ -82,9 +69,7 @@ public class DevDeviceModelService extends ServiceImpl<DevDeviceModelMapper, Dev
     @Transactional
     public void update(Long id, DevDeviceModel model) {
         getById(id);
-        DevDeviceModel exist = getOne(new LambdaQueryWrapper<DevDeviceModel>()
-                .eq(DevDeviceModel::getCode, model.getCode())
-                .ne(DevDeviceModel::getId, id));
+        DevDeviceModel exist = baseMapper.selectByCodeExcludeId(model.getCode(), id);
         if (exist != null) {
             throw new BusinessException(409, "型号编码已存在");
         }
@@ -95,15 +80,11 @@ public class DevDeviceModelService extends ServiceImpl<DevDeviceModelMapper, Dev
     @Transactional
     public void delete(Long id) {
         getById(id);
-        long deviceCount = devDeviceMapper.selectCount(
-                new LambdaQueryWrapper<DevDevice>()
-                        .eq(DevDevice::getModelId, id));
+        long deviceCount = devDeviceMapper.countByModelId(id);
         if (deviceCount > 0) {
             throw new BusinessException("该型号下存在关联设备，无法删除");
         }
-        long registerCount = devRegisterMapMapper.selectCount(
-                new LambdaQueryWrapper<DevRegisterMap>()
-                        .eq(DevRegisterMap::getModelId, id));
+        long registerCount = devRegisterMapMapper.countByModelId(id);
         if (registerCount > 0) {
             throw new BusinessException("该型号下存在点表寄存器，无法删除");
         }
@@ -111,8 +92,7 @@ public class DevDeviceModelService extends ServiceImpl<DevDeviceModelMapper, Dev
     }
 
     private boolean existsByCode(String code) {
-        return getOne(new LambdaQueryWrapper<DevDeviceModel>()
-                .eq(DevDeviceModel::getCode, code)) != null;
+        return baseMapper.selectByCode(code) != null;
     }
 
     private void copyProperties(DevDeviceModel src, DeviceModelVO dst) {

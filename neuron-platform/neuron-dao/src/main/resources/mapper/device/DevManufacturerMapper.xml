@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aziot.dao.mapper.device.DevManufacturerMapper">
+
+    <select id="selectPageByKeyword" resultType="com.aziot.dao.entity.device.DevManufacturer">
+        SELECT * FROM dev_manufacturer
+        <where>
+            is_deleted = 0
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%')
+                 OR code LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectByCodeExcludeId" resultType="com.aziot.dao.entity.device.DevManufacturer">
+        SELECT * FROM dev_manufacturer
+        WHERE code = #{code} AND id != #{excludeId} AND is_deleted = 0
+    </select>
+
+    <select id="selectByCode" resultType="com.aziot.dao.entity.device.DevManufacturer">
+        SELECT * FROM dev_manufacturer
+        WHERE code = #{code} AND is_deleted = 0
+    </select>
+
+    <select id="countByManufacturerId" resultType="long">
+        SELECT COUNT(*) FROM dev_device_model
+        WHERE manufacturer_id = #{manufacturerId}
+    </select>
+
+</mapper>

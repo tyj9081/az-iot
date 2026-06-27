@@ -1,11 +1,9 @@
 package com.aziot.service.device;
 
 import com.aziot.common.exception.BusinessException;
-import com.aziot.dao.entity.device.DevDeviceModel;
 import com.aziot.dao.entity.device.DevManufacturer;
 import com.aziot.dao.mapper.device.DevDeviceModelMapper;
 import com.aziot.dao.mapper.device.DevManufacturerMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -21,13 +19,7 @@ public class DevManufacturerService extends ServiceImpl<DevManufacturerMapper, D
     }
 
     public Page<DevManufacturer> page(int page, int pageSize, String keyword) {
-        LambdaQueryWrapper<DevManufacturer> qw = new LambdaQueryWrapper<>();
-        if (keyword != null && !keyword.isBlank()) {
-            qw.and(w -> w.like(DevManufacturer::getName, keyword)
-                    .or().like(DevManufacturer::getCode, keyword));
-        }
-        qw.orderByAsc(DevManufacturer::getId);
-        return page(new Page<>(page, pageSize), qw);
+        return baseMapper.selectPageByKeyword(new Page<>(page, pageSize), keyword);
     }
 
     public DevManufacturer getById(Long id) {
@@ -49,9 +41,7 @@ public class DevManufacturerService extends ServiceImpl<DevManufacturerMapper, D
     @Transactional
     public void update(Long id, DevManufacturer manufacturer) {
         getById(id);
-        DevManufacturer exist = getOne(new LambdaQueryWrapper<DevManufacturer>()
-                .eq(DevManufacturer::getCode, manufacturer.getCode())
-                .ne(DevManufacturer::getId, id));
+        DevManufacturer exist = baseMapper.selectByCodeExcludeId(manufacturer.getCode(), id);
         if (exist != null) {
             throw new BusinessException(409, "制造商编码已存在");
         }
@@ -62,9 +52,7 @@ public class DevManufacturerService extends ServiceImpl<DevManufacturerMapper, D
     @Transactional
     public void delete(Long id) {
         getById(id);
-        long count = devDeviceModelMapper.selectCount(
-                new LambdaQueryWrapper<DevDeviceModel>()
-                        .eq(DevDeviceModel::getManufacturerId, id));
+        long count = devDeviceModelMapper.countByManufacturerId(id);
         if (count > 0) {
             throw new BusinessException("该制造商下存在关联型号，无法删除");
         }
@@ -72,7 +60,6 @@ public class DevManufacturerService extends ServiceImpl<DevManufacturerMapper, D
     }
 
     private boolean existsByCode(String code) {
-        return getOne(new LambdaQueryWrapper<DevManufacturer>()
-                .eq(DevManufacturer::getCode, code)) != null;
+        return baseMapper.selectByCode(code) != null;
     }
 }

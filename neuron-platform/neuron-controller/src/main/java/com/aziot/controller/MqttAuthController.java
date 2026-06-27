@@ -2,7 +2,6 @@ package com.aziot.controller;
 
 import com.aziot.dao.entity.collector.DevCollector;
 import com.aziot.dao.mapper.collector.DevCollectorMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -30,8 +29,7 @@ public class MqttAuthController {
         }
 
         // 查找采集器凭证
-        DevCollector collector = collectorMapper.selectOne(
-            new LambdaQueryWrapper<DevCollector>().eq(DevCollector::getMqttUsername, username));
+        DevCollector collector = collectorMapper.selectByMqttUsername(username);
         if (collector == null || !passwordEncoder.matches(password, collector.getMqttPasswordHash())) {
             return Map.of("result", "deny");
         }

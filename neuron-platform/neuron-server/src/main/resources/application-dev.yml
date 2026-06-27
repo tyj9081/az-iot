@@ -1,16 +1,21 @@
 # 本地开发环境配置
 # 启动方式: java -jar app.jar --spring.profiles.active=dev
 # 或设置环境变量 SPRING_PROFILES_ACTIVE=dev
+#
+# ⚠️ 敏感凭据通过环境变量注入, 切勿硬编码:
+#   DB_PASSWORD  — MySQL 密码
+#   MQTT_PASSWORD — EMQX 密码
+#   JWT_SECRET   — JWT 签名密钥 (至少 256 bits)
 
 spring:
   datasource:
     url: jdbc:mysql://8.163.61.99:3306/neuron_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: jeff_remote
-    password: Gzb1qVL74XFmaueq
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 jwt:
-  secret: dev-only-jwt-secret-key-at-least-256-bits-long-for-local-development
+  secret: ${JWT_SECRET:dev-only-jwt-secret-key-at-least-256-bits-long-for-local-development}
   access-token-expiration: 1800000
   refresh-token-expiration: 604800000
 
@@ -21,8 +26,13 @@ logging:
   level:
     com.aziot: DEBUG
 
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
 app:
   mqtt:
     broker-url: tcp://8.163.61.99:1883
     username: neuron-server
-    password: emqx_neuron_2026
+    password: ${MQTT_PASSWORD:}
