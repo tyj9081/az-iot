@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class DevDeviceVO {
     private Long id;
     private Long serialPortId;
+    private Long collectorId;
     private Long modelId;
     private String code;
     private String name;

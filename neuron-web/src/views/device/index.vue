@@ -76,9 +76,9 @@
       <el-table-column prop="modelName" label="型号" width="140" />
       <el-table-column prop="protocolName" label="协议" width="100" />
       <el-table-column prop="collectorName" label="采集器" width="120" />
-      <el-table-column prop="portName" label="串口" width="100" />
+      <el-table-column prop="serialPortName" label="串口" width="100" />
       <el-table-column prop="slaveAddr" label="从站地址" width="100" />
-      <el-table-column prop="collectInterval" label="采集间隔(ms)" width="130">
+      <el-table-column prop="collectIntervalSec" label="采集间隔(s)" width="130">
         <template #default="{ row }">
           {{ row.collectInterval ?? '-' }}
         </template>
@@ -325,7 +325,7 @@ async function fetchList() {
       keyword: searchKeyword.value || undefined,
       collectorId: filterCollectorId.value || undefined,
       serialPortId: filterSerialPortId.value || undefined,
-      deviceModelId: filterModelId.value || undefined,
+      modelId: filterModelId.value || undefined,
       status: filterStatus.value || undefined
     })
     tableData.value = res.data?.records ?? []
@@ -387,16 +387,16 @@ async function openDialog(row?: any) {
     dialogModelOptions.value = []
   }
 
-  if (row) {
+    if (row) {
     form.id = row.id
     form.code = row.code
     form.name = row.name
     form.collectorId = row.collectorId ?? null
     form.serialPortId = row.serialPortId ?? null
-    form.deviceModelId = row.deviceModelId ?? null
+    form.deviceModelId = row.modelId ?? null
     form.protocolId = row.protocolId ?? null
     form.slaveAddr = row.slaveAddr ?? 1
-    form.collectInterval = row.collectInterval ?? ''
+    form.collectInterval = row.collectIntervalSec ?? ''
 
     // 回显协议信息
     if (row.protocolId) {
@@ -445,12 +445,10 @@ async function handleSubmit() {
     const payload = {
       code: form.code,
       name: form.name,
-      collectorId: form.collectorId,
       serialPortId: form.serialPortId,
-      deviceModelId: form.deviceModelId,
-      protocolId: form.protocolId,
+      modelId: form.deviceModelId,
       slaveAddr: form.slaveAddr,
-      collectInterval: form.collectInterval ? Number(form.collectInterval) : undefined
+      collectIntervalSec: form.collectInterval ? Number(form.collectInterval) : undefined
     }
     if (isEdit.value && form.id) {
       await deviceApi.update(form.id, payload)
@@ -478,14 +476,14 @@ async function handleDelete(row: any) {
 }
 
 async function handleDisable(row: any) {
-  const newStatus = row.status === 'disabled' ? 1 : 0
-  const label = newStatus === 1 ? '启用' : '禁用'
+  const targetStatus = row.status === 'disabled' ? 'online' : 'disabled'
+  const label = targetStatus === 'online' ? '启用' : '禁用'
   await ElMessageBox.confirm('确定' + label + '该设备吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
   })
-  await deviceApi.updateStatus(row.id, newStatus)
+  await deviceApi.updateStatus(row.id, targetStatus)
   ElMessage.success(label + '成功')
   fetchList()
 }

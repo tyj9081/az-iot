@@ -498,8 +498,8 @@ onMounted(async () => {
       deviceApi.getById(deviceId),
       readingApi.latest(deviceId)
     ])
-    device.value = deviceRes ?? deviceRes?.data ?? {}
-    readings.value = readingsRes?.data ?? readingsRes ?? []
+    device.value = deviceRes?.data ?? {}
+    readings.value = readingsRes?.data ?? []
     await loadAlarmConfig()
     await loadInstructions()
   } catch {

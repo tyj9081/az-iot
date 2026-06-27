@@ -20,7 +20,7 @@ public class DeviceController {
     private final DevDeviceService deviceService;
 
     @GetMapping
-    public ApiResponse<PageResult<DevDevice>> list(
+    public ApiResponse<PageResult<DevDeviceVO>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(required = false) Long collectorId,
@@ -28,7 +28,7 @@ public class DeviceController {
             @RequestParam(required = false) Long modelId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword) {
-        var result = deviceService.page(page, pageSize, collectorId, serialPortId, modelId, status, keyword);
+        var result = deviceService.pageWithDetails(page, pageSize, collectorId, serialPortId, modelId, status, keyword);
         return ApiResponse.ok(new PageResult<>(result.getRecords(), result.getTotal(), page, pageSize));
     }
 

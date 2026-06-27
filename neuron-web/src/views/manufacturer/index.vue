@@ -22,7 +22,7 @@
           <a v-if="row.website" :href="row.website" target="_blank">{{ row.website }}</a>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" min-width="160" />
+      <el-table-column prop="createdAt" label="创建时间" min-width="160" />
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openDialog(row)">编辑</el-button>

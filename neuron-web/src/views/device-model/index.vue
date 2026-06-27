@@ -46,9 +46,17 @@
     <el-table v-loading="loading" :data="tableData" border stripe>
       <el-table-column prop="code" label="编码" min-width="120" />
       <el-table-column prop="name" label="名称" min-width="150" />
-      <el-table-column prop="manufacturer_name" label="厂商" min-width="120" />
-      <el-table-column prop="protocol_name" label="协议" min-width="100" />
-      <el-table-column prop="created_at" label="创建时间" min-width="160" />
+      <el-table-column label="厂商" min-width="120">
+        <template #default="{ row }">
+          {{ manufacturerList.find((m: any) => m.id === row.manufacturerId)?.name ?? '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="协议" min-width="100">
+        <template #default="{ row }">
+          {{ protocolList.find((p: any) => p.id === row.protocolId)?.name ?? '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createdAt" label="创建时间" min-width="160" />
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openDialog(row)">编辑</el-button>

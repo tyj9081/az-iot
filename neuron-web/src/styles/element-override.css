@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════
+   Element Plus Component Overrides
+   基于 AZ-IOT Design Tokens 的统一组件风格
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Button ─── */
+.el-button {
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-tight);
+  transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--color-brand-500);
+  --el-button-border-color: var(--color-brand-500);
+  --el-button-hover-bg-color: var(--color-brand-600);
+  --el-button-hover-border-color: var(--color-brand-600);
+  --el-button-active-bg-color: var(--color-brand-700);
+  box-shadow: var(--shadow-xs);
+}
+
+.el-button--primary:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.el-button--primary:active {
+  transform: translateY(0);
+}
+
+/* Link button 更精致 */
+.el-button.is-link {
+  font-weight: var(--font-weight-medium);
+}
+
+/* ─── Table ─── */
+.el-table {
+  --el-table-border-color: var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.el-table th.el-table__cell {
+  background: var(--surface-tertiary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  text-transform: none;
+  letter-spacing: var(--tracking-wide);
+  border-bottom: 2px solid var(--border-light);
+  padding: 14px 0;
+}
+
+.el-table td.el-table__cell {
+  font-size: var(--text-sm);
+  color: var(--color-gray-700);
+  padding: 12px 0;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--surface-secondary);
+}
+
+.el-table__body tr:hover > td.el-table__cell {
+  background: var(--color-brand-50) !important;
+  transition: background var(--duration-fast) var(--ease-out-quart);
+}
+
+/* ─── Tag ─── */
+.el-tag {
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-xs);
+  padding: 2px 10px;
+  letter-spacing: var(--tracking-wide);
+  border: none;
+}
+
+.el-tag--success {
+  background: var(--color-success-50);
+  color: var(--color-success-600);
+}
+
+.el-tag--warning {
+  background: var(--color-warning-50);
+  color: var(--color-warning-600);
+}
+
+.el-tag--danger {
+  background: var(--color-danger-50);
+  color: var(--color-danger-600);
+}
+
+.el-tag--info {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+/* ─── Dialog ─── */
+.el-dialog {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+}
+
+.el-dialog__header {
+  padding: var(--space-6) var(--space-6) var(--space-3);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.el-dialog__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+}
+
+.el-dialog__body {
+  padding: var(--space-6);
+}
+
+.el-dialog__footer {
+  padding: var(--space-3) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--border-light);
+}
+
+/* ─── Form ─── */
+.el-form-item__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-700);
+  font-size: var(--text-sm);
+}
+
+.el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--border-light) inset;
+  transition: box-shadow var(--duration-fast) var(--ease-out-quart);
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--color-gray-300) inset;
+}
+
+.el-input.is-focus .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--color-brand-500) inset, 0 0 0 3px var(--color-brand-100);
+}
+
+/* ─── Select ─── */
+.el-select .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--border-light) inset;
+}
+
+.el-select .el-input.is-focus .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--color-brand-500) inset, 0 0 0 3px var(--color-brand-100);
+}
+
+/* ─── Pagination ─── */
+.el-pagination {
+  margin-top: var(--space-4);
+  justify-content: flex-end;
+}
+
+.el-pagination .el-pager li.is-active {
+  background: var(--color-brand-500);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Menu (sidebar) ─── */
+.el-menu {
+  border-right: none !important;
+}
+
+.el-menu-item {
+  font-size: var(--text-sm);
+  height: 44px;
+  line-height: 44px;
+  margin: 2px 8px;
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.el-menu-item:hover {
+  background: var(--color-brand-50) !important;
+  color: var(--color-brand-600) !important;
+}
+
+.el-menu-item.is-active {
+  background: var(--color-brand-50) !important;
+  color: var(--color-brand-600) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Sub-menu */
+.el-sub-menu__title {
+  font-size: var(--text-sm);
+  height: 44px;
+  line-height: 44px;
+  margin: 2px 8px;
+  border-radius: var(--radius-md);
+}
+
+.el-sub-menu__title:hover {
+  background: var(--color-brand-50) !important;
+}
+
+.el-sub-menu .el-menu-item {
+  padding-left: 48px !important;
+}
+
+/* ─── Card ─── */
+.el-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ─── Empty State ─── */
+.el-empty__description {
+  color: var(--color-gray-400);
+}
+
+/* ─── Switch ─── */
+.el-switch.is-checked .el-switch__core {
+  background-color: var(--color-success-500);
+  border-color: var(--color-success-500);
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* ─── Selection & Focus ─── */
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-brand-800);
+}
+
+/* Keyboard focus visible styles */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

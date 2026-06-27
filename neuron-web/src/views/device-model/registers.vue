@@ -19,18 +19,18 @@
     </div>
 
     <el-table v-loading="loading" :data="tableData" border stripe>
-      <el-table-column prop="sensor_code" label="传感器编码" min-width="130" />
-      <el-table-column prop="sensor_name" label="传感器名称" min-width="150" />
+      <el-table-column prop="sensorCode" label="传感器编码" min-width="130" />
+      <el-table-column prop="sensorName" label="传感器名称" min-width="150" />
       <el-table-column label="寄存器地址" min-width="140">
         <template #default="{ row }">
           <span class="register-address">
-            <el-tag size="small" type="info">{{ toHex(row.register_address) }}</el-tag>
-            <span class="addr-dec">{{ row.register_address }}</span>
+            <el-tag size="small" type="info">{{ toHex(row.registerAddress) }}</el-tag>
+            <span class="addr-dec">{{ row.registerAddress }}</span>
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="data_type" label="数据类型" min-width="100" />
-      <el-table-column prop="byte_order" label="字节序" min-width="90" />
+      <el-table-column prop="dataType" label="数据类型" min-width="100" />
+      <el-table-column prop="byteOrder" label="字节序" min-width="90" />
       <el-table-column prop="coefficient" label="系数" min-width="80" />
       <el-table-column prop="unit" label="单位" min-width="70" />
       <el-table-column prop="rw" label="读写" min-width="70">
@@ -40,7 +40,7 @@
           <el-tag v-else size="small" type="success">读写</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="sort_order" label="排序" min-width="70" />
+      <el-table-column prop="sortOrder" label="排序" min-width="70" />
       <el-table-column label="操作" width="120" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openDialog(row)">编辑</el-button>
@@ -195,15 +195,15 @@ function openDialog(row?: any) {
   isEdit.value = !!row
   if (row) {
     form.id = row.id
-    form.sensor_code = row.sensor_code
-    form.sensor_name = row.sensor_name
-    form.register_address = row.register_address
-    form.data_type = row.data_type
-    form.byte_order = row.byte_order
+    form.sensor_code = row.sensorCode
+    form.sensor_name = row.sensorName
+    form.register_address = row.registerAddress
+    form.data_type = row.dataType
+    form.byte_order = row.byteOrder
     form.coefficient = row.coefficient ?? 1
     form.unit = row.unit ?? ''
     form.rw = row.rw
-    form.sort_order = row.sort_order ?? 0
+    form.sort_order = row.sortOrder ?? 0
   }
   dialogVisible.value = true
 }

@@ -6,6 +6,11 @@ import App from './App.vue'
 import router from './router'
 import { createPinia } from 'pinia'
 
+/* AZ-IOT Design System */
+import './styles/tokens.css'
+import './styles/global.css'
+import './styles/element-override.css'
+
 const app = createApp(App)
 app.use(ElementPlus, { locale: zhCn })
 app.use(router)

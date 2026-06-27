@@ -19,8 +19,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,6 +74,92 @@ public class DevDeviceService extends ServiceImpl<DevDeviceMapper, DevDevice> {
         return page(new Page<>(page, pageSize), qw);
     }
 
+    /**
+     * 分页查询设备列表，并自动填充关联的串口名、采集器名、型号名、协议名。
+     */
+    public Page<DevDeviceVO> pageWithDetails(int page, int pageSize, Long collectorId,
+                                              Long serialPortId, Long modelId, String status, String keyword) {
+        Page<DevDevice> devicePage = page(page, pageSize, collectorId, serialPortId, modelId, status, keyword);
+        List<DevDevice> devices = devicePage.getRecords();
+        if (devices.isEmpty()) {
+            Page<DevDeviceVO> voPage = new Page<>(page, pageSize);
+            voPage.setTotal(0);
+            return voPage;
+        }
+
+        // 批量收集关联ID
+        Set<Long> portIds = devices.stream().map(DevDevice::getSerialPortId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> modelIds = devices.stream().map(DevDevice::getModelId).filter(Objects::nonNull).collect(Collectors.toSet());
+
+        // 批量查询串口
+        Map<Long, DevSerialPort> portMap = portIds.isEmpty() ? Collections.emptyMap() :
+                devSerialPortMapper.selectBatchIds(portIds).stream()
+                        .collect(Collectors.toMap(DevSerialPort::getId, Function.identity()));
+
+        // 批量查询采集器（通过串口关联）
+        Set<Long> collectorIds = portMap.values().stream()
+                .map(DevSerialPort::getCollectorId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DevCollector> collectorMap = collectorIds.isEmpty() ? Collections.emptyMap() :
+                devCollectorMapper.selectBatchIds(collectorIds).stream()
+                        .collect(Collectors.toMap(DevCollector::getId, Function.identity()));
+
+        // 批量查询型号
+        Map<Long, DevDeviceModel> modelMap = modelIds.isEmpty() ? Collections.emptyMap() :
+                devDeviceModelMapper.selectBatchIds(modelIds).stream()
+                        .collect(Collectors.toMap(DevDeviceModel::getId, Function.identity()));
+
+        // 批量查询协议（通过型号关联）
+        Set<Long> protocolIds = modelMap.values().stream()
+                .map(DevDeviceModel::getProtocolId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DevProtocol> protocolMap = protocolIds.isEmpty() ? Collections.emptyMap() :
+                devProtocolMapper.selectBatchIds(protocolIds).stream()
+                        .collect(Collectors.toMap(DevProtocol::getId, Function.identity()));
+
+        // 组装 VO
+        List<DevDeviceVO> voList = devices.stream().map(d -> {
+            DevDeviceVO vo = new DevDeviceVO();
+            vo.setId(d.getId());
+            vo.setSerialPortId(d.getSerialPortId());
+            vo.setModelId(d.getModelId());
+            vo.setCode(d.getCode());
+            vo.setName(d.getName());
+            vo.setSlaveAddr(d.getSlaveAddr());
+            vo.setCollectIntervalSec(d.getCollectIntervalSec());
+            vo.setStatus(d.getStatus());
+            vo.setLocation(d.getLocation());
+            vo.setDescription(d.getDescription());
+            vo.setCreatedAt(d.getCreatedAt());
+            vo.setUpdatedAt(d.getUpdatedAt());
+
+            DevSerialPort port = portMap.get(d.getSerialPortId());
+            if (port != null) {
+                vo.setSerialPortName(port.getPortName());
+                vo.setCollectorId(port.getCollectorId());
+                DevCollector collector = collectorMap.get(port.getCollectorId());
+                if (collector != null) {
+                    vo.setCollectorName(collector.getName());
+                }
+            }
+
+            DevDeviceModel model = modelMap.get(d.getModelId());
+            if (model != null) {
+                vo.setModelName(model.getName());
+                vo.setProtocolId(model.getProtocolId());
+                DevProtocol protocol = protocolMap.get(model.getProtocolId());
+                if (protocol != null) {
+                    vo.setProtocolName(protocol.getName());
+                }
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        Page<DevDeviceVO> voPage = new Page<>(page, pageSize);
+        voPage.setRecords(voList);
+        voPage.setTotal(devicePage.getTotal());
+        return voPage;
+    }
+
     public DevDeviceVO getById(Long id) {
         DevDevice device = super.getById(id);
         if (device == null) {
@@ -96,6 +182,7 @@ public class DevDeviceService extends ServiceImpl<DevDeviceMapper, DevDevice> {
         DevSerialPort port = devSerialPortMapper.selectById(device.getSerialPortId());
         if (port != null) {
             vo.setSerialPortName(port.getPortName());
+            vo.setCollectorId(port.getCollectorId());
             DevCollector collector = devCollectorMapper.selectById(port.getCollectorId());
             if (collector != null) {
                 vo.setCollectorName(collector.getName());
