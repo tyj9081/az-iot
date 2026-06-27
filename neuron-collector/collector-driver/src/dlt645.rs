@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use collector_model::{BusType, Device};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::ProtocolDriver;
 
@@ -48,10 +48,10 @@ impl ProtocolDriver for DLT645Driver {
             let di = decode_data_identifier(&pt.register_address, &pt.func_code);
             let frame = build_645_read_frame(&addr, &di, self.is_1997);
             port.write_all(&frame).context("DL/T645 write")?;
-            tokio::time::sleep(Duration::from_millis(200)).await;
+            std::thread::sleep(Duration::from_millis(200));
 
             let mut buf = [0u8; 256];
-            let n = port.read(&mut buf).await.context("DL/T645 read")?;
+            let n = port.read(&mut buf).context("DL/T645 read")?;
             if n < 10 { continue; }
 
             if let Some(value) = parse_645_response(&buf[..n]) {

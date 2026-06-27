@@ -1,3 +1,4 @@
+use collector_driver::DriverFactory;
 use collector_model::{Device, LatestReading};
 use collector_uploader::Uploader;
 use std::collections::HashMap;
@@ -19,8 +20,23 @@ impl DeviceRegistry {
 
     pub fn register(&mut self, device: Device) {
         let bus_key = self.bus_key(&device);
+        self.remove(device.id);
         self.bus_groups.entry(bus_key).or_default().push(device.id);
         self.devices.insert(device.id, device);
+    }
+
+    pub fn remove(&mut self, id: i64) {
+        if let Some(device) = self.devices.remove(&id) {
+            let bus_key = self.bus_key(&device);
+            let mut remove_group = false;
+            if let Some(ids) = self.bus_groups.get_mut(&bus_key) {
+                ids.retain(|device_id| *device_id != id);
+                remove_group = ids.is_empty();
+            }
+            if remove_group {
+                self.bus_groups.remove(&bus_key);
+            }
+        }
     }
 
     pub fn get(&self, id: i64) -> Option<&Device> {
@@ -32,6 +48,12 @@ impl DeviceRegistry {
             collector_model::BusType::Serial { port_name, .. } => port_name.clone(),
             collector_model::BusType::Tcp { host, port } => format!("{}:{}", host, port),
         }
+    }
+}
+
+impl Default for DeviceRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -48,30 +70,51 @@ impl Collector {
         Self { registry, uploader }
     }
 
-    /// 主循环：轮询采集设备并上报
     pub async fn run(&self) -> anyhow::Result<()> {
-        let device_count = self.registry.read().await.devices.len();
         tracing::info!(
             "Scheduler running with {} devices, channel: {}",
-            device_count,
+            self.registry.read().await.devices.len(),
             self.uploader.active_channel().await
         );
 
-        // 主循环：每秒轮询一次（Phase 2 会改成按设备采集间隔调度）
         loop {
-            let registry = self.registry.read().await;
-            for (id, _device) in registry.devices.iter() {
-                // 模拟采集读数 (Phase 2: 调用 driver.collect())
-                let reading = LatestReading {
-                    device_id: *id,
-                    sensor_code: "demo".into(),
-                    value: rand::random::<f64>() * 100.0,
-                    unit: "units".into(),
-                    read_at: chrono::Utc::now().to_rfc3339(),
+            let devices: Vec<Device> = {
+                let registry = self.registry.read().await;
+                registry.devices.values().cloned().collect()
+            };
+
+            for device in devices {
+                let Some(driver) = DriverFactory::create(&device) else {
+                    tracing::warn!(
+                        "No driver available for device {} protocol {:?}",
+                        device.id,
+                        device.protocol
+                    );
+                    continue;
                 };
-                self.uploader.publish(&reading).await;
+
+                let result = tokio::task::block_in_place(|| driver.collect(&device));
+                match result {
+                    Ok(values) => {
+                        for point in &device.data_points {
+                            if let Some(value) = values.get(&point.sensor_code) {
+                                let reading = LatestReading {
+                                    device_id: device.id,
+                                    sensor_code: point.sensor_code.clone(),
+                                    value: *value,
+                                    unit: point.unit.clone(),
+                                    read_at: chrono::Utc::now().to_rfc3339(),
+                                };
+                                self.uploader.publish(&reading).await;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!("Collect failed for device {}: {}", device.id, err);
+                    }
+                }
             }
-            drop(registry);
+
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }

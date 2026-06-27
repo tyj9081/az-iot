@@ -4,8 +4,8 @@
 use anyhow::{Context, Result};
 use collector_model::{BusType, Device};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::ProtocolDriver;
 
@@ -39,10 +39,10 @@ impl ProtocolDriver for IEC101Driver {
             let ioa = pt.register_address as u32;
             let frame = build_iec101_frame(asdu_addr, 100, 6, ioa);
             port.write_all(&frame).context("IEC101 write")?;
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            std::thread::sleep(Duration::from_millis(300));
 
             let mut buf = [0u8; 256];
-            let n = port.read(&mut buf).await.context("IEC101 read")?;
+            let n = port.read(&mut buf).context("IEC101 read")?;
             if let Some(val) = parse_iec101_response(&buf[..n]) {
                 readings.insert(pt.sensor_code.clone(), super::apply_transform(val, pt.coefficient, pt.offset));
             }

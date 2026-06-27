@@ -20,9 +20,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rumqttc = { workspace = true }
 collector-model = { path = "../collector-model" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-rumqttc = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"

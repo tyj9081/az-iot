@@ -57,8 +57,8 @@ fn build_opcua_hello() -> Vec<u8> {
 fn build_hello_body() -> Vec<u8> {
     let mut body = Vec::new();
     body.extend_from_slice(&0u32.to_le_bytes()); // Protocol version
-    body.extend_from_slice(&(64 * 1024).to_le_bytes()); // Receive buffer size
-    body.extend_from_slice(&(64 * 1024).to_le_bytes()); // Send buffer size
+    body.extend_from_slice(&(64_u32 * 1024).to_le_bytes()); // Receive buffer size
+    body.extend_from_slice(&(64_u32 * 1024).to_le_bytes()); // Send buffer size
     body.extend_from_slice(&(1024u32).to_le_bytes()); // Max message size
     body.extend_from_slice(&(10u32).to_le_bytes()); // Max chunk count
     // Endpoint URL

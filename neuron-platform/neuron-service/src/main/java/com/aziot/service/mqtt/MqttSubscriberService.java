@@ -16,6 +16,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -138,8 +139,9 @@ public class MqttSubscriberService {
         if (client == null || !client.isConnected()) return;
         try {
             client.subscribe("neuron/+/reading", 1);
+            client.subscribe("neuron/+/latest", 1);
             client.subscribe("neuron/+/status", 1);
-            log.info("MQTT subscribed: neuron/+/reading, neuron/+/status");
+            log.info("MQTT subscribed: neuron/+/reading, neuron/+/latest, neuron/+/status");
         } catch (MqttException e) {
             log.error("MQTT subscribe failed: {}", e.getMessage());
         }
@@ -190,9 +192,13 @@ public class MqttSubscriberService {
             String readAtStr = (String) data.getOrDefault("read_at", "");
             LocalDateTime readAt;
             try {
-                readAt = LocalDateTime.parse(readAtStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                readAt = OffsetDateTime.parse(readAtStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDateTime();
             } catch (Exception e) {
-                readAt = LocalDateTime.now();
+                try {
+                    readAt = LocalDateTime.parse(readAtStr);
+                } catch (Exception ignored) {
+                    readAt = LocalDateTime.now();
+                }
             }
 
             // 查找 register_id

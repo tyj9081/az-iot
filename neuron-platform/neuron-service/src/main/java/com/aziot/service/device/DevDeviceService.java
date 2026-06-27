@@ -207,6 +207,9 @@ public class DevDeviceService extends ServiceImpl<DevDeviceMapper, DevDevice> {
         if (existsByCode(device.getCode())) {
             throw new BusinessException(409, "设备编码已存在");
         }
+        if (device.getStatus() == null || device.getStatus().isBlank()) {
+            device.setStatus("offline");
+        }
         save(device);
         configPushService.pushDelta(device.getId(), "add");
     }
@@ -240,6 +243,9 @@ public class DevDeviceService extends ServiceImpl<DevDeviceMapper, DevDevice> {
         DevDevice device = super.getById(id);
         if (device == null) {
             throw BusinessException.notFound("设备");
+        }
+        if (!Set.of("offline", "online", "alarm", "disabled").contains(status)) {
+            throw new BusinessException(400, "无效设备状态");
         }
         device.setStatus(status);
         updateById(device);

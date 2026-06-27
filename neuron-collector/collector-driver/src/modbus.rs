@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio_modbus::prelude::*;
+use tokio_serial::SerialPortBuilderExt;
 
 use super::ProtocolDriver;
 
@@ -125,11 +126,9 @@ impl ProtocolDriver for ModbusRTUDriver {
         handle.block_on(async {
             let builder = tokio_serial::new(&port_name, baud)
                 .timeout(Duration::from_secs(3));
-            let port = builder.open_native()
+            let port = builder.open_native_async()
                 .with_context(|| format!("Open serial port {port_name}"))?;
-            let mut ctx = tokio_modbus::client::rtu::connect(port)
-                .context("ModbusRTU connect")?;
-            ctx.set_slave(Slave(device.slave_addr));
+            let mut ctx = tokio_modbus::client::rtu::attach_slave(port, Slave(device.slave_addr));
             mb_collect_async(&mut ctx, device).await
         })
     }

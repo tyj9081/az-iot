@@ -237,7 +237,7 @@ impl Uploader {
 
     async fn publish_mqtt(&self, reading: &LatestReading) {
         let topic = format!(
-            "{}/{}/latest",
+            "{}/{}/reading",
             self.mqtt_config.topic_prefix, reading.device_id
         );
         let payload = match serde_json::to_string(reading) {

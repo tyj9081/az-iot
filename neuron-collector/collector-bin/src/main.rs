@@ -15,6 +15,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 加载配置 (默认值, 生产环境从 config.toml 读取)
     let config = CollectorConfig::load().unwrap_or_default();
+    let sync_mqtt = config.mqtt.clone();
 
     // 初始化双通道 Uploader
     let uploader = Arc::new(
@@ -32,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     // 启动配置同步 (后台任务)
     let sync_collector = collector.clone();
     tokio::spawn(async move {
-        collector_config_sync::run(sync_collector).await;
+        collector_config_sync::run(sync_collector, sync_mqtt).await;
     });
 
     collector.run().await?;

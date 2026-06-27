@@ -1,6 +1,10 @@
 package com.aziot.service.device;
 
 import com.aziot.dao.entity.device.DevDeviceReading;
+import com.aziot.dao.entity.device.DevDevice;
+import com.aziot.dao.entity.device.DevDeviceAlarmConfig;
+import com.aziot.dao.mapper.device.DevDeviceAlarmConfigMapper;
+import com.aziot.dao.mapper.device.DevDeviceMapper;
 import com.aziot.dao.mapper.device.DevDeviceReadingMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -10,6 +14,14 @@ import java.util.*;
 
 @Service
 public class DevDeviceReadingService extends ServiceImpl<DevDeviceReadingMapper, DevDeviceReading> {
+
+    private final DevDeviceMapper deviceMapper;
+    private final DevDeviceAlarmConfigMapper alarmConfigMapper;
+
+    public DevDeviceReadingService(DevDeviceMapper deviceMapper, DevDeviceAlarmConfigMapper alarmConfigMapper) {
+        this.deviceMapper = deviceMapper;
+        this.alarmConfigMapper = alarmConfigMapper;
+    }
 
     // Latest readings for a device (all sensor codes, most recent only)
     public List<DevDeviceReading> latestByDeviceId(Long deviceId) {
@@ -42,13 +54,22 @@ public class DevDeviceReadingService extends ServiceImpl<DevDeviceReadingMapper,
     // Dashboard stats
     public Map<String, Object> dashboardOverview() {
         Map<String, Object> stats = new LinkedHashMap<>();
-        // Use COUNT queries on baseMapper
-        stats.put("totalDevices", baseMapper.selectCount(null));
+        stats.put("totalDevices", deviceMapper.selectCount(null));
         stats.put("todayReadings", baseMapper.selectCount(
             new LambdaQueryWrapper<DevDeviceReading>()
                 .ge(DevDeviceReading::getReadAt, LocalDateTime.now().withHour(0).withMinute(0).withSecond(0))));
-        stats.put("onlineDevices", 0); // Will be populated by collector heartbeat in later phase
-        stats.put("alarms", 0);
+        stats.put("onlineDevices", deviceMapper.selectCount(
+            new LambdaQueryWrapper<DevDevice>()
+                .eq(DevDevice::getStatus, "online")));
+        stats.put("alarms", deviceMapper.selectCount(
+            new LambdaQueryWrapper<DevDevice>()
+                .eq(DevDevice::getStatus, "alarm")));
+        stats.put("alarmRules", alarmConfigMapper.selectCount(
+            new LambdaQueryWrapper<DevDeviceAlarmConfig>()
+                .eq(DevDeviceAlarmConfig::getAlarmEnabled, 1)));
+        stats.put("recentReadings", list(new LambdaQueryWrapper<DevDeviceReading>()
+            .orderByDesc(DevDeviceReading::getReadAt)
+            .last("LIMIT 20")));
         return stats;
     }
 }

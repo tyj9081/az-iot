@@ -171,7 +171,7 @@
         </el-table-column>
         <el-table-column prop="ts" label="采集时间" min-width="170">
           <template #default="{ row }">
-            {{ formatTime(row.ts) }}
+            {{ formatTime(row.readAt ?? row.ts) }}
           </template>
         </el-table-column>
       </el-table>
@@ -253,15 +253,21 @@ function ringOffset(pct: number): string {
   return (-(pct / 100) * ringTotal).toFixed(1)
 }
 
-// Generate mock hourly bars (would come from API in production)
 function generateHourlyBars(readings: any[]) {
-  const hours = Array.from({ length: 12 }, (_, i) => i + 8) // 8:00-19:00
-  const maxCount = Math.max(readings.length, 20) // avoid 0 max
-  
-  return hours.map(h => {
-    const count = Math.floor(Math.random() * readings.length * 2) + 5
+  const counts = new Map<string, number>()
+  readings.forEach(item => {
+    const ts = item.readAt ?? item.ts
+    if (!ts) return
+    const date = new Date(ts)
+    if (Number.isNaN(date.getTime())) return
+    const hour = date.getHours().toString().padStart(2, '0') + ':00'
+    counts.set(hour, (counts.get(hour) ?? 0) + 1)
+  })
+  const maxCount = Math.max(...Array.from(counts.values()), 1)
+
+  return Array.from(counts.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([hour, count]) => {
     return {
-      hour: h + ':00',
+      hour,
       count,
       height: Math.round((count / maxCount) * 100)
     }

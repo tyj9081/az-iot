@@ -4,8 +4,8 @@
 use anyhow::{Context, Result};
 use collector_model::{BusType, Device};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::ProtocolDriver;
 
@@ -36,10 +36,10 @@ impl ProtocolDriver for ProfibusDPDriver {
         let mut readings = HashMap::new();
         let req = build_profibus_dp_read(device.slave_addr);
         port.write_all(&req).context("PROFIBUS write")?;
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        std::thread::sleep(Duration::from_millis(50));
 
         let mut buf = [0u8; 256];
-        let n = port.read(&mut buf).await.context("PROFIBUS read")?;
+        let n = port.read(&mut buf).context("PROFIBUS read")?;
 
         let input_data = parse_profibus_response(&buf[..n]);
         for (i, pt) in device.data_points.iter().enumerate() {

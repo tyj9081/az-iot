@@ -22,6 +22,7 @@ public class ConfigPushService {
     private final DevSerialPortMapper serialPortMapper;
     private final DevCollectorMapper collectorMapper;
     private final DevDeviceModelMapper modelMapper;
+    private final DevProtocolMapper protocolMapper;
     private final DevRegisterMapMapper registerMapMapper;
     private final DevDeviceAlarmConfigMapper alarmConfigMapper;
     private final MqttPublisherService mqttPublisher;
@@ -36,6 +37,9 @@ public class ConfigPushService {
             DevCollector collector = collectorMapper.selectById(port.getCollectorId());
             if (collector == null) return;
             DevDeviceModel model = modelMapper.selectById(device.getModelId());
+            if (model == null) return;
+            DevProtocol protocol = protocolMapper.selectById(model.getProtocolId());
+            if (protocol == null) return;
             List<DevRegisterMap> registers = registerMapMapper.selectList(
                 new LambdaQueryWrapper<DevRegisterMap>()
                     .eq(DevRegisterMap::getModelId, device.getModelId()));
@@ -48,14 +52,23 @@ public class ConfigPushService {
             deviceNode.put("id", device.getId());
             deviceNode.put("code", device.getCode());
             deviceNode.put("name", device.getName());
-            deviceNode.put("protocol", model.getProtocolId());
+            deviceNode.put("protocol", protocol.getCode());
             deviceNode.put("slave_addr", device.getSlaveAddr());
 
             Map<String, Object> bus = new LinkedHashMap<>();
-            bus.put("port_name", port.getPortName());
-            bus.put("bus_type", port.getBusType());
-            bus.put("bus_param", objectMapper.readTree(port.getBusParam()));
+            if ("tcp".equalsIgnoreCase(protocol.getBusType())) {
+                Map<String, Object> tcp = new LinkedHashMap<>();
+                tcp.put("host", collector.getIpAddress());
+                tcp.put("port", 502);
+                bus.put("tcp", tcp);
+            } else {
+                Map<String, Object> serial = new LinkedHashMap<>();
+                serial.put("port_name", port.getPortName());
+                serial.put("bus_param", objectMapper.readTree(port.getBusParam()));
+                bus.put("serial", serial);
+            }
             deviceNode.put("serial_port", bus);
+            deviceNode.put("bus", bus);
 
             List<Map<String, Object>> dps = new ArrayList<>();
             for (DevRegisterMap rm : registers) {
@@ -63,13 +76,13 @@ public class ConfigPushService {
                 dp.put("sensor_code", rm.getSensorCode());
                 dp.put("sensor_name", rm.getSensorName());
                 dp.put("register_address", rm.getRegisterAddress());
-                dp.put("register_count", rm.getRegisterCount());
+                dp.put("register_count", rm.getRegisterCount() == null ? 1 : rm.getRegisterCount());
                 dp.put("data_type", rm.getDataType());
                 dp.put("byte_order", rm.getByteOrder());
                 dp.put("func_code", rm.getFuncCode());
-                dp.put("coefficient", rm.getCoefficient());
-                dp.put("offset", rm.getOffsetVal());
-                dp.put("unit", rm.getUnit());
+                dp.put("coefficient", rm.getCoefficient() == null ? 1 : rm.getCoefficient());
+                dp.put("offset", rm.getOffsetVal() == null ? 0 : rm.getOffsetVal());
+                dp.put("unit", rm.getUnit() == null ? "" : rm.getUnit());
                 dps.add(dp);
             }
             deviceNode.put("data_points", dps);
