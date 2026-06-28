@@ -314,8 +314,8 @@ impl Uploader {
 
     async fn publish_mqtt(&self, reading: &LatestReading) {
         let topic = format!(
-            "{}/{}/reading",
-            self.mqtt_config.topic_prefix, reading.device_id
+            "{}/{}/latest",
+            self.mqtt_config.topic_prefix, self.mqtt_config.client_id
         );
         let payload = match serde_json::to_string(reading) {
             Ok(p) => p,
