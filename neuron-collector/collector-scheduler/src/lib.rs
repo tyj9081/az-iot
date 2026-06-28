@@ -267,8 +267,13 @@ impl Collector {
                             }
                         }
                         tracing::warn!(
-                            "Device {} FAIL protocol={} error_type={} elapsed={}ms consecutive={}",
-                            dev_id, proto, error_type, elapsed_ms, consecutive
+                            "Device {} FAIL protocol={} error_type={} elapsed={}ms consecutive={}: {}",
+                            dev_id, proto, error_type, elapsed_ms, consecutive,
+                            if last_err_msg.len() > 120 {
+                                format!("{}…", &last_err_msg[..120])
+                            } else {
+                                last_err_msg.clone()
+                            }
                         );
                     }
                 }

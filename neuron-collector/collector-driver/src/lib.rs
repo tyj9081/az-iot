@@ -112,7 +112,14 @@ where
     match rx.recv_timeout(Duration::from_secs(5)) {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => Err(e),
-        Err(_) => Err(anyhow::anyhow!("Async operation timed out after 5s")),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            Err(anyhow::anyhow!("Async operation timed out after 5s"))
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            Err(anyhow::anyhow!(
+                "Async task panicked or driver runtime shut down (tx disconnected)"
+            ))
+        }
     }
 }
 
