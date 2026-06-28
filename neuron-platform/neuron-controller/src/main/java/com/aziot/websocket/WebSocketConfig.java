@@ -11,7 +11,6 @@ import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,7 +27,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(realtimeHandler, "/ws/realtime")
-                .setAllowedOriginPatterns(List.of("*"))  // TODO: restrict to frontend domain in production
+                .setAllowedOriginPatterns("*")  // TODO: restrict to frontend domain in production
                 .addInterceptors(new HttpSessionHandshakeInterceptor() {
                     @Override
                     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
