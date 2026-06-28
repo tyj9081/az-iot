@@ -12,6 +12,9 @@ use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, StopBits};
 use super::{block_on_driver_runtime, ProtocolDriver};
 
 /// Shared Modbus collection logic — runs inside tokio runtime context.
+///
+/// **容错设计**：单个寄存器读取失败不影响其他寄存器。
+/// 失败的寄存器记 WARN 日志后跳过，避免一个坏点表配置导致全部数据丢失。
 async fn mb_collect_async(
     ctx: &mut tokio_modbus::client::Context,
     device: &Device,
@@ -29,58 +32,82 @@ async fn mb_collect_async(
         let raw: Vec<u16> = match fc {
             1 | 2 => {
                 let result = ctx.read_coils(addr, count).await
-                    .with_context(|| format!("Read coils at {addr}"))?;
+                    .with_context(|| format!("Read coils at {addr}"));
                 match result {
-                    Ok(coils) => {
+                    Ok(Ok(coils)) => {
                         tracing::debug!(
                             "Modbus coils read OK: addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
                     }
-                    Err(exception) => {
-                        return Err(anyhow::anyhow!(
-                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                    Ok(Err(exception)) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
-                        ));
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Modbus read error fc={} addr={} count={}: {:#} — skipped",
+                            fc, addr, count, e
+                        );
+                        continue;
                     }
                 }
             }
             3 | 4 => {
                 let result = ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"))?;
+                    .with_context(|| format!("Read registers at {addr}"));
                 match result {
-                    Ok(data) => {
+                    Ok(Ok(data)) => {
                         tracing::debug!(
                             "Modbus registers read OK: addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         data
                     }
-                    Err(exception) => {
-                        return Err(anyhow::anyhow!(
-                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                    Ok(Err(exception)) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
-                        ));
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Modbus read error fc={} addr={} count={}: {:#} — skipped",
+                            fc, addr, count, e
+                        );
+                        continue;
                     }
                 }
             }
             _ => {
                 let result = ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"))?;
+                    .with_context(|| format!("Read registers at {addr}"));
                 match result {
-                    Ok(data) => {
+                    Ok(Ok(data)) => {
                         tracing::debug!(
                             "Modbus registers read OK (default fc): addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         data
                     }
-                    Err(exception) => {
-                        return Err(anyhow::anyhow!(
-                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                    Ok(Err(exception)) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
-                        ));
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Modbus read error fc={} addr={} count={}: {:#} — skipped",
+                            fc, addr, count, e
+                        );
+                        continue;
                     }
                 }
             }
