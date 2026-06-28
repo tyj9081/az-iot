@@ -29,12 +29,11 @@ pub mod ethernet_ip;
 pub mod fins;
 pub mod mitsubishi;
 
-use anyhow::{Context, Result};
-use collector_model::{BusParam, BusType, Device, ProtocolType};
+use anyhow::Result;
+use collector_model::{Device, ProtocolType};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::time::Duration;
-use tokio_serial::SerialPortBuilderExt;
 use tracing::warn;
 
 /// 驱动层专用 I/O runtime，完全独立于主调度器的 tokio runtime。
@@ -56,36 +55,6 @@ pub(crate) fn driver_runtime() -> &'static tokio::runtime::Runtime {
             .build()
             .expect("Failed to create driver I/O runtime")
     })
-}
-
-/// 串口可用性预检（异步版本）— 调度器在 async context 中直接 await，
-/// 不走 block_on，避免 "Cannot start a runtime from within a runtime" panic。
-///
-/// 流程：打开串口 → 立即关闭。不进行任何读写操作。
-/// 超时 500ms，保证快速失败。
-pub async fn probe_serial_async(port_name: &str, bus_param: &BusParam) -> Result<()> {
-    let builder = tokio_serial::new(port_name, bus_param.baud)
-        .data_bits(match bus_param.data_bits {
-            5 => tokio_serial::DataBits::Five,
-            6 => tokio_serial::DataBits::Six,
-            7 => tokio_serial::DataBits::Seven,
-            _ => tokio_serial::DataBits::Eight,
-        })
-        .parity(match bus_param.parity.as_str() {
-            "odd" => tokio_serial::Parity::Odd,
-            "even" => tokio_serial::Parity::Even,
-            _ => tokio_serial::Parity::None,
-        })
-        .stop_bits(match bus_param.stop_bits {
-            2 => tokio_serial::StopBits::Two,
-            _ => tokio_serial::StopBits::One,
-        })
-        .timeout(Duration::from_millis(500));
-    let _port = builder
-        .open_native_async()
-        .with_context(|| format!("Probe serial port {port_name}"))?;
-    // 端口打开成功，立即 drop 关闭
-    Ok(())
 }
 
 /// sync→async 桥接：在驱动层独立 Runtime 上执行异步任务，通过 mpsc channel 返回结果。

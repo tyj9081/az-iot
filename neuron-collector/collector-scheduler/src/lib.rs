@@ -1,4 +1,4 @@
-use collector_driver::{probe_serial_async, DriverFactory};
+use collector_driver::DriverFactory;
 use collector_model::{BusType, Device, LatestReading};
 use collector_reporter::{Aggregator, AlarmEngine};
 use collector_uploader::Uploader;
@@ -89,7 +89,6 @@ impl Collector {
         );
 
         let mut tick = 0u64;
-        let mut probed_devices: HashSet<i64> = HashSet::new();
         loop {
             let devices: Vec<Device> = {
                 let registry = self.registry.read().await;
@@ -112,49 +111,8 @@ impl Collector {
                 tracing::info!("Scheduler tick={} devices=0 (idle)", tick);
             }
 
-            // ── 串口可用性预检 ──────────────────────────
-            // 对新出现或重启后未探过的串口设备，做一次快速端口打开测试。
-            // 通过则静默记录，失败则立刻以 ERROR 级别告警。
-            //
-            // ⚠️ 关键：probe 和 collect 不能在同一次迭代中对同一设备执行。
-            //   Windows 串口句柄释放不是瞬时的，probe 打开→关闭后
-            //   collect 立刻再打开会触发 "拒绝访问"(Access Denied)，
-            //   device 陷入持续失败链。
-            //   因此：probe 通过的设备，跳过本轮采集，下一轮再做。
-            let mut just_probed: HashSet<i64> = HashSet::new();
-            for device in &devices {
-                if probed_devices.contains(&device.id) {
-                    continue;
-                }
-                if let BusType::Serial { port_name, bus_param } = &device.bus {
-                    match probe_serial_async(port_name, bus_param).await {
-                        Ok(()) => {
-                            tracing::info!(
-                                "Port probe OK  device={} port={} protocol={}",
-                                device.id, port_name, device.protocol.code()
-                            );
-                            just_probed.insert(device.id);
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Port probe FAIL device={} name={} port={} protocol={}: {:#}",
-                                device.id, device.name, port_name, device.protocol.code(), e
-                            );
-                        }
-                    }
-                }
-                probed_devices.insert(device.id);
-            }
-
             for device in devices {
                 let dev_id = device.id;
-
-                // 跳过本轮刚探完的设备，给 Windows 串口释放留出时间
-                if just_probed.contains(&dev_id) {
-                    tracing::debug!("Device {} skipped this tick (port just probed)", dev_id);
-                    continue;
-                }
-
                 let proto = device.protocol.code().to_string();
                 let start = Instant::now();
 
