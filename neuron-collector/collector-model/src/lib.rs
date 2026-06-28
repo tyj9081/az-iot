@@ -129,7 +129,7 @@ pub enum BusType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusParam {
-    #[serde(default = "default_baud")]
+    #[serde(default = "default_baud", alias = "baud_rate")]
     pub baud: u32,
     #[serde(default = "default_data_bits")]
     pub data_bits: u8,
