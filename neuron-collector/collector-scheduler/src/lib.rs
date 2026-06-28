@@ -113,6 +113,10 @@ impl Collector {
 
                 match result {
                     Ok(values) => {
+                        let count = values.len();
+                        if count > 0 {
+                            tracing::info!("Device {} collected {} data points", device.id, count);
+                        }
                         for point in &device.data_points {
                             if let Some(value) = values.get(&point.sensor_code) {
                                 let reading = LatestReading {

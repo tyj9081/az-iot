@@ -4,7 +4,10 @@ import com.aziot.common.dto.ApiResponse;
 import com.aziot.common.dto.PageResult;
 import com.aziot.controller.dto.CollectorCreateDTO;
 import com.aziot.dao.entity.collector.DevCollector;
+import com.aziot.dao.entity.device.DevDevice;
+import com.aziot.dao.mapper.device.DevDeviceMapper;
 import com.aziot.service.collector.DevCollectorService;
+import com.aziot.service.mqtt.ConfigPushService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +20,8 @@ import java.util.Map;
 public class CollectorController {
 
     private final DevCollectorService collectorService;
+    private final ConfigPushService configPushService;
+    private final DevDeviceMapper deviceMapper;
 
     @GetMapping
     public ApiResponse<PageResult<DevCollector>> list(
@@ -76,5 +81,17 @@ public class CollectorController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         collectorService.delete(id);
         return ApiResponse.ok();
+    }
+
+    /** 下发该采集器下所有设备的配置 */
+    @PostMapping("/{id}/push-config")
+    public ApiResponse<Map<String, Object>> pushConfig(@PathVariable Long id) {
+        var devices = deviceMapper.selectByCollectorId(id);
+        int count = 0;
+        for (DevDevice device : devices) {
+            configPushService.pushDelta(device.getId(), "add");
+            count++;
+        }
+        return ApiResponse.ok(Map.of("collectorId", id, "deviceCount", count, "status", "pushed"));
     }
 }

@@ -30,4 +30,8 @@ public interface DevDeviceMapper extends BaseMapper<DevDevice> {
 
     /** 统计在线设备数 */
     long countByStatus(@Param("status") String status);
+
+    /** 按采集器ID查所有设备（通过关联的串口） */
+    @org.apache.ibatis.annotations.Select("SELECT d.* FROM dev_device d INNER JOIN dev_serial_port p ON d.serial_port_id = p.id WHERE p.collector_id = #{collectorId}")
+    java.util.List<DevDevice> selectByCollectorId(@Param("collectorId") Long collectorId);
 }

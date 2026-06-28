@@ -3,8 +3,10 @@ package com.aziot.service.mqtt;
 import com.aziot.dao.entity.device.DevDeviceReading;
 import com.aziot.dao.mapper.device.DevDeviceReadingMapper;
 import com.aziot.dao.mapper.device.DevRegisterMapMapper;
+import com.aziot.dao.mapper.device.DevDeviceMapper;
 import com.aziot.dao.mapper.collector.DevCollectorMapper;
 import com.aziot.dao.entity.collector.DevCollector;
+import com.aziot.dao.entity.device.DevDevice;
 import com.aziot.dao.entity.device.DevRegisterMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -66,14 +68,17 @@ public class MqttSubscriberService {
 
     private final DevDeviceReadingMapper readingMapper;
     private final DevRegisterMapMapper registerMapMapper;
+    private final DevDeviceMapper deviceMapper;
     private final DevCollectorMapper collectorMapper;
     private final ObjectMapper objectMapper;
 
     public MqttSubscriberService(DevDeviceReadingMapper readingMapper,
                                   DevRegisterMapMapper registerMapMapper,
+                                  DevDeviceMapper deviceMapper,
                                   DevCollectorMapper collectorMapper) {
         this.readingMapper = readingMapper;
         this.registerMapMapper = registerMapMapper;
+        this.deviceMapper = deviceMapper;
         this.collectorMapper = collectorMapper;
         this.objectMapper = new ObjectMapper();
     }
@@ -230,6 +235,13 @@ public class MqttSubscriberService {
             reading.setReadAt(readAt);
 
             readingMapper.insert(reading);
+
+            // 设备有数据上报，标记为在线
+            DevDevice device = deviceMapper.selectById(deviceId);
+            if (device != null && !"online".equals(device.getStatus())) {
+                device.setStatus("online");
+                deviceMapper.updateById(device);
+            }
         } catch (Exception e) {
             log.error("MQTT message handle failed topic={}: {}", topic, e.getMessage());
         }

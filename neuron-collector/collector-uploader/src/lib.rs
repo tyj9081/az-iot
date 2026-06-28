@@ -332,9 +332,9 @@ impl Uploader {
                 .await
             {
                 Ok(_) => {
-                    tracing::debug!(
-                        "[UPLOADER] MQTT published to {} = {:.3}{}",
-                        topic, reading.value, reading.unit
+                    tracing::info!(
+                        "[UPLOADER] Published device={} sensor={} value={:.3}{}",
+                        reading.device_id, reading.sensor_code, reading.value, reading.unit
                     );
                 }
                 Err(e) => {

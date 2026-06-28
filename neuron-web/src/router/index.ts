@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '点表管理' }
       },
       {
+        path: 'collector',
+        name: 'Collector',
+        component: () => import('@/views/collector/list.vue'),
+        meta: { title: '采集器' }
+      },
+      {
         path: 'device',
         name: 'Device',
         component: () => import('@/views/device/index.vue'),

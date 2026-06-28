@@ -50,8 +50,19 @@
               </svg>
               <span>型号管理</span>
             </router-link>
-            <router-link to="/device" class="nav-item nav-item--child" active-class="active">
+            <router-link to="/collector" class="nav-item nav-item--child" active-class="active">
               <span class="nav-step-badge">3</span>
+              <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
+                <rect x="2" y="3" width="16" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="4" y="8" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="13" y="8" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="4" y="14" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="13" y="14" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              <span>采集器</span>
+            </router-link>
+            <router-link to="/device" class="nav-item nav-item--child" active-class="active">
+              <span class="nav-step-badge">4</span>
               <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
                 <rect x="4" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
                 <circle cx="10" cy="11" r="2" stroke="currentColor" stroke-width="1.5"/>
@@ -64,7 +75,7 @@
           <div class="nav-group">
             <div class="nav-group-label">运行监控</div>
             <router-link to="/dashboard" class="nav-item nav-item--child" active-class="active">
-              <span class="nav-step-badge">4</span>
+              <span class="nav-step-badge">5</span>
               <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
                 <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
                 <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>

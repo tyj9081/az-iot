@@ -8,5 +8,6 @@ export const collectorApi = {
   update: (id: number, data: any) => request.put('/collectors/' + id, data),
   remove: (id: number) => request.delete('/collectors/' + id),
   getSerialPorts: (id: number) => request.get('/collectors/' + id + '/serial-ports'),
-  updateSerialPort: (cid: number, pid: number, data: any) => request.put('/collectors/' + cid + '/serial-ports/' + pid, data)
+  updateSerialPort: (cid: number, pid: number, data: any) => request.put('/collectors/' + cid + '/serial-ports/' + pid, data),
+  pushConfig: (id: number) => request.post('/collectors/' + id + '/push-config')
 }
