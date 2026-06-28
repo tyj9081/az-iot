@@ -224,21 +224,21 @@ impl LocalStorage {
         Self::count_lines(&self.file_path)
     }
 
-/// Default path for device registry persistence.
-pub const REGISTRY_PATH: &str = "devices.json";
-
     // ─── Device Registry Persistence ─────────────────────
+
+    /// Default path for device registry persistence.
+    const REGISTRY_PATH: &str = "devices.json";
 
     /// Save devices to the default registry file.
     pub fn save_devices_static(devices: &[Device]) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(devices)?;
-        fs::write(REGISTRY_PATH, json)?;
+        fs::write(Self::REGISTRY_PATH, json)?;
         Ok(())
     }
 
     /// Load persisted devices from the default registry file.
     pub fn load_devices_static() -> Vec<Device> {
-        let path = Path::new(REGISTRY_PATH);
+        let path = Path::new(Self::REGISTRY_PATH);
         if !path.exists() {
             tracing::info!("No persisted registry found, starting fresh");
             return vec![];

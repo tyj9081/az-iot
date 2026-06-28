@@ -125,6 +125,7 @@ dependencies = [
  "collector-storage",
  "collector-telemetry",
  "collector-uploader",
+ "reqwest",
  "rumqttc",
  "serde",
  "serde_json",
@@ -132,6 +133,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]

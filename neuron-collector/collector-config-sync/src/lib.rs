@@ -5,10 +5,15 @@ use collector_uploader::MqttUploadConfig;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
-pub async fn run(collector: Collector, mqtt: MqttUploadConfig) {
+pub async fn run(
+    collector: Collector,
+    mqtt: MqttUploadConfig,
+    device_count: Arc<RwLock<u64>>,
+) {
     loop {
-        if let Err(err) = run_once(collector.clone(), mqtt.clone()).await {
+        if let Err(err) = run_once(collector.clone(), mqtt.clone(), device_count.clone()).await {
             tracing::warn!("Config sync stopped: {err}. Reconnecting in 5s");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
@@ -24,7 +29,11 @@ async fn save_registry(registry: &Arc<tokio::sync::RwLock<DeviceRegistry>>) {
     }
 }
 
-async fn run_once(collector: Collector, mqtt: MqttUploadConfig) -> anyhow::Result<()> {
+async fn run_once(
+    collector: Collector,
+    mqtt: MqttUploadConfig,
+    device_count: Arc<RwLock<u64>>,
+) -> anyhow::Result<()> {
     let (host, port) = parse_broker_url(&mqtt.broker)
         .unwrap_or_else(|| (mqtt.broker.trim_start_matches("tcp://").to_string(), 1883));
     let client_id = format!("{}-config-sync", mqtt.client_id);
@@ -46,7 +55,7 @@ async fn run_once(collector: Collector, mqtt: MqttUploadConfig) -> anyhow::Resul
                 let payload = String::from_utf8_lossy(&packet.payload);
                 tracing::info!("Config delta received, len={}B", payload.len());
                 match serde_json::from_str::<ConfigDelta>(&payload) {
-                    Ok(delta) => apply_delta(&collector, delta).await,
+                    Ok(delta) => apply_delta(&collector, delta, &device_count).await,
                     Err(err) => tracing::warn!("Invalid config delta: {err}; payload={payload}"),
                 }
             }
@@ -55,7 +64,11 @@ async fn run_once(collector: Collector, mqtt: MqttUploadConfig) -> anyhow::Resul
     }
 }
 
-async fn apply_delta(collector: &Collector, delta: ConfigDelta) {
+async fn apply_delta(
+    collector: &Collector,
+    delta: ConfigDelta,
+    device_count: &Arc<RwLock<u64>>,
+) {
     let mut registry = collector.registry.write().await;
     match delta.action.as_str() {
         "add" | "update" => {
@@ -66,6 +79,8 @@ async fn apply_delta(collector: &Collector, delta: ConfigDelta) {
                 let protocol = device.protocol.display_name();
                 let dp_count = device.data_points.len();
                 registry.register(device);
+                // 更新遥测设备计数
+                *device_count.write().await = registry.devices.len() as u64;
                 tracing::info!(
                     "Device registered: id={} code={} name={} protocol={} data_points={}",
                     id, code, name, protocol, dp_count
@@ -79,6 +94,7 @@ async fn apply_delta(collector: &Collector, delta: ConfigDelta) {
         "remove" => {
             if let Some(device) = delta.device {
                 registry.remove(device.id);
+                *device_count.write().await = registry.devices.len() as u64;
                 tracing::info!("Applied config delta remove device_id={}", device.id);
             } else {
                 tracing::warn!("Config delta remove missing device");

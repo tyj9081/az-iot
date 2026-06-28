@@ -84,14 +84,10 @@ impl Collector {
                 registry.devices.values().cloned().collect()
             };
 
-            // 心跳日志, 每 10 个周期 (≈10s) 打印一次设备数
+            // 心跳日志, 每 30 秒打印一次设备数（无设备时减少噪音）
             tick += 1;
-            if tick % 10 == 1 || !devices.is_empty() {
-                tracing::info!(
-                    "Scheduler tick={} devices={}",
-                    tick,
-                    devices.len()
-                );
+            if devices.is_empty() && tick % 30 == 1 {
+                tracing::info!("Scheduler tick={} devices=0 (idle)", tick);
             }
 
             for device in devices {

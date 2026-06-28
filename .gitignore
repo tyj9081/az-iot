@@ -10,6 +10,7 @@ target/
 debug/
 release/
 *.rs.bk
+.cargo_home/
 .cargo-home/
 .cargo/
 

@@ -72,6 +72,9 @@ public class MqttSubscriberService {
     private final DevCollectorMapper collectorMapper;
     private final ObjectMapper objectMapper;
 
+    /** 设备在线状态缓存(减少 DB 查询): deviceId → 最后在线时间戳 */
+    private final Map<Long, Long> deviceOnlineCache = new ConcurrentHashMap<>();
+
     public MqttSubscriberService(DevDeviceReadingMapper readingMapper,
                                   DevRegisterMapMapper registerMapMapper,
                                   DevDeviceMapper deviceMapper,
@@ -236,11 +239,16 @@ public class MqttSubscriberService {
 
             readingMapper.insert(reading);
 
-            // 设备有数据上报，标记为在线
-            DevDevice device = deviceMapper.selectById(deviceId);
-            if (device != null && !"online".equals(device.getStatus())) {
-                device.setStatus("online");
-                deviceMapper.updateById(device);
+            // 设备有数据上报，标记为在线 (缓存 10s 过期, 减少 DB 查询)
+            Long now = System.currentTimeMillis();
+            Long cached = deviceOnlineCache.get(deviceId);
+            if (cached == null || (now - cached) > 10_000) {
+                deviceOnlineCache.put(deviceId, now);
+                DevDevice device = deviceMapper.selectById(deviceId);
+                if (device != null && !"online".equals(device.getStatus())) {
+                    device.setStatus("online");
+                    deviceMapper.updateById(device);
+                }
             }
         } catch (Exception e) {
             log.error("MQTT message handle failed topic={}: {}", topic, e.getMessage());

@@ -399,6 +399,24 @@ impl Uploader {
         self.reconnect_notify.notify_one();
     }
 
+    /// 发布原始 payload 到指定 MQTT topic (供 telemetry 等模块使用)
+    pub async fn publish_raw(&self, topic: &str, payload: &str) {
+        let channel = *self.channel.read().await;
+        if channel != Channel::Mqtt {
+            tracing::debug!("[UPLOADER] publish_raw skipped: channel={:?}", channel);
+            return;
+        }
+        let client_guard = self.mqtt_client.read().await;
+        if let Some(ref client) = *client_guard {
+            match client.publish(topic, QoS::AtLeastOnce, false, payload.as_bytes()).await {
+                Ok(_) => tracing::debug!("[UPLOADER] publish_raw OK topic={}", topic),
+                Err(e) => tracing::warn!("[UPLOADER] publish_raw failed topic={}: {}", topic, e),
+            }
+        } else {
+            tracing::debug!("[UPLOADER] publish_raw skipped: no MQTT client");
+        }
+    }
+
     /// 当前活跃通道
     pub async fn active_channel(&self) -> &'static str {
         match *self.channel.read().await {
