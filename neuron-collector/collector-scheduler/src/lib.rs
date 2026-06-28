@@ -170,10 +170,13 @@ impl Collector {
                     Failure { error_type: &'static str },
                 }
 
+                let mut last_err_msg = String::new();
+
                 let outcome = match timeout_result {
                     // 正常完成
                     Ok(Ok(collect_r)) => match collect_r {
                         Ok(values) if values.is_empty() => {
+                            last_err_msg = "empty result (no data points collected)".into();
                             PollOutcome::Failure { error_type: "empty_result" }
                         }
                         Ok(values) => PollOutcome::Success(values),
@@ -181,6 +184,7 @@ impl Collector {
                             // 遍历 anyhow error chain 查找底层错误类型。
                             // downcast_ref 只查最外层，会被 .with_context() 遮蔽，
                             // 所以需要同时用 root_cause() 到达 error chain 底部。
+                            last_err_msg = format!("{:#}", err);
                             let error_type =
                                 if err.downcast_ref::<std::io::Error>().is_some()
                                     || err.root_cause().is::<std::io::Error>()
@@ -198,6 +202,7 @@ impl Collector {
                     },
                     // spawn_blocking panic (driver 内部 bug)
                     Ok(Err(join_err)) => {
+                        last_err_msg = join_err.to_string();
                         tracing::warn!(
                             "Collect task panicked for device {}: {}",
                             dev_id, join_err
@@ -206,6 +211,7 @@ impl Collector {
                     }
                     // 超时
                     Err(_elapsed) => {
+                        last_err_msg = "timeout after 5s".into();
                         PollOutcome::Failure { error_type: "timeout" }
                     }
                 };
@@ -247,6 +253,7 @@ impl Collector {
                             if let Some(dev) = registry.devices.get_mut(&dev_id) {
                                 dev.consecutive_failures += 1;
                                 dev.last_error_at = Some(chrono::Utc::now().timestamp());
+                                dev.last_error_msg = last_err_msg.clone();
                                 consecutive = dev.consecutive_failures;
                                 if dev.consecutive_failures >= 3 && dev.online {
                                     dev.online = false;
@@ -301,7 +308,6 @@ impl Collector {
                     let mut aggs = self.aggregators.lock().await;
                     let aggregator = aggs
                         .entry(device.id)
-                        .and_modify(|a| *a = Aggregator::new(device.id, 60))
                         .or_insert_with(|| Aggregator::new(device.id, 60));
                     let now_ts = chrono::Utc::now().timestamp();
                     for point in &device.data_points {
@@ -340,7 +346,6 @@ impl Collector {
                         let mut engines = self.alarm_engines.lock().await;
                         let alarm_engine = engines
                             .entry(device.id)
-                            .and_modify(|e| *e = AlarmEngine::new(&device.alarm_config))
                             .or_insert_with(|| AlarmEngine::new(&device.alarm_config));
 
                         let mut to_send = Vec::new();
