@@ -129,10 +129,30 @@ pub enum BusType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusParam {
+    #[serde(default = "default_baud")]
     pub baud: u32,
+    #[serde(default = "default_data_bits")]
     pub data_bits: u8,
+    #[serde(default = "default_stop_bits")]
     pub stop_bits: u8,
+    #[serde(default = "default_parity")]
     pub parity: String,
+}
+
+fn default_baud() -> u32 { 9600 }
+fn default_data_bits() -> u8 { 8 }
+fn default_stop_bits() -> u8 { 1 }
+fn default_parity() -> String { "none".into() }
+
+impl Default for BusParam {
+    fn default() -> Self {
+        Self {
+            baud: 9600,
+            data_bits: 8,
+            stop_bits: 1,
+            parity: "none".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
