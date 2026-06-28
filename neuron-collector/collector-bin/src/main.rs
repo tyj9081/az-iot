@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
             )
             .with_target(false)
             .init();
-        return collector_debug::run(file.as_deref());
+        return collector_debug::run(file.as_deref()).await;
     }
 
     // ─── 正常采集模式 ───────────────────────────────────

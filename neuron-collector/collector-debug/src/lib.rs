@@ -18,7 +18,8 @@ use anyhow::Result;
 use collector_model::Device;
 use std::path::Path;
 
-pub fn run(devices_path: Option<&str>) -> Result<()> {
+/// 直接从 async main() 调用, 复用已有 tokio runtime
+pub async fn run(devices_path: Option<&str>) -> Result<()> {
     let path = devices_path.unwrap_or("devices.json");
 
     let devices: Vec<Device> = if Path::new(path).exists() {
@@ -34,9 +35,5 @@ pub fn run(devices_path: Option<&str>) -> Result<()> {
         vec![]
     };
 
-    // 复用 main() 已创建的 tokio runtime, 不能嵌套 Runtime::new()
-    let handle = tokio::runtime::Handle::current();
-    handle.block_on(async move {
-        menu::main_loop(devices).await
-    })
+    menu::main_loop(devices).await
 }
