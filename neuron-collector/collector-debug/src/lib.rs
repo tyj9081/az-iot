@@ -34,9 +34,9 @@ pub fn run(devices_path: Option<&str>) -> Result<()> {
         vec![]
     };
 
-    // 启动 tokio runtime (collector-driver 内部需要)
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(async move {
+    // 复用 main() 已创建的 tokio runtime, 不能嵌套 Runtime::new()
+    let handle = tokio::runtime::Handle::current();
+    handle.block_on(async move {
         menu::main_loop(devices).await
     })
 }
