@@ -67,6 +67,10 @@ pub(crate) fn driver_runtime() -> &'static tokio::runtime::Runtime {
 ///
 /// **方案**：`spawn()` 把任务推入驱动 Runtime 的调度队列（不检查 context），
 /// 调用方线程通过 channel 阻塞等待结果。零 `block_on`。
+///
+/// **超时保护**：4 秒 timeout 在 **任务内部** 执行（tokio::time::timeout），
+/// 不在 channel 上做超时。这样超时发生时 tokio 会 cancel future → drop 所有资源
+/// → COM 端口被正确关闭，不会出现"任务还活着、端口未释放、下一轮 Access Denied"的泄漏。
 pub(crate) fn block_on_driver_runtime<F, T>(future: F) -> Result<T>
 where
     F: std::future::Future<Output = Result<T>> + Send + 'static,
@@ -75,21 +79,20 @@ where
     let (tx, rx) = std::sync::mpsc::channel();
     let rt = driver_runtime();
     rt.spawn(async move {
-        let result = future.await;
-        let _ = tx.send(result);
+        // 超时在任务内部，超时后 tokio 会 cancel future、drop 所有资源
+        let result = tokio::time::timeout(Duration::from_secs(4), future).await;
+        let _ = tx.send(match result {
+            Ok(Ok(val)) => Ok(val),
+            Ok(Err(e)) => Err(e),
+            Err(_elapsed) => Err(anyhow::anyhow!("Async operation timed out after 4s")),
+        });
     });
-    match rx.recv_timeout(Duration::from_secs(5)) {
-        Ok(Ok(value)) => Ok(value),
-        Ok(Err(e)) => Err(e),
-        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-            Err(anyhow::anyhow!("Async operation timed out after 5s"))
-        }
-        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-            Err(anyhow::anyhow!(
-                "Async task panicked or driver runtime shut down (tx disconnected)"
-            ))
-        }
-    }
+    // channel 不做超时：任务内部已保证 4s 内一定发消息
+    rx.recv().unwrap_or_else(|_| {
+        Err(anyhow::anyhow!(
+            "Task panicked or driver runtime shut down (tx disconnected)"
+        ))
+    })
 }
 
 // ─── Trait ────────────────────────────────────────────
