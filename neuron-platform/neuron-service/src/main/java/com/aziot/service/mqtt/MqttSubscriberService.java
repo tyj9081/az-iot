@@ -77,6 +77,9 @@ public class MqttSubscriberService {
     private final RealtimeCache realtimeCache;
     private final ObjectMapper objectMapper;
 
+    /** 已显式订阅的采集器 mqttClientId（避免 wildcard ACL 问题） */
+    private final Map<String, Boolean> subscribedCollectors = new ConcurrentHashMap<>();
+
     /** 设备在线状态缓存(减少 DB 查询): deviceId → 最后在线时间戳 */
     private final Map<Long, Long> deviceOnlineCache = new ConcurrentHashMap<>();
 
@@ -164,12 +167,38 @@ public class MqttSubscriberService {
     private void subscribe() {
         if (client == null || !client.isConnected()) return;
         try {
-            client.subscribe("neuron/+/reading", 1);
-            client.subscribe("neuron/+/latest", 1);
+            // 仅用一个窄 wildcard 感知新采集器上线（status 消息触发显式订阅）
             client.subscribe("neuron/+/status", 1);
-            log.info("MQTT subscribed: neuron/+/reading, neuron/+/latest, neuron/+/status");
-        } catch (MqttException e) {
+            log.info("MQTT subscribed: neuron/+/status (wildcard for new collector detection)");
+
+            // 从 DB 加载已有采集器，逐个显式订阅（避免 wildcard ACL 问题）
+            var collectors = collectorMapper.selectList(null);
+            for (var collector : collectors) {
+                subscribeCollector(collector.getMqttClientId());
+            }
+        } catch (Exception e) {
             log.error("MQTT subscribe failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 为指定采集器显式订阅 3 个 topic（neuron/{clientId}/latest, /reading, /status）
+     * 去重：同一 clientId 只订阅一次。
+     */
+    private void subscribeCollector(String mqttClientId) {
+        if (mqttClientId == null || mqttClientId.isBlank()) return;
+        if (client == null || !client.isConnected()) return;
+        if (subscribedCollectors.putIfAbsent(mqttClientId, Boolean.TRUE) != null) {
+            return; // 已订阅过
+        }
+        try {
+            client.subscribe("neuron/" + mqttClientId + "/latest", 1);
+            client.subscribe("neuron/" + mqttClientId + "/reading", 1);
+            client.subscribe("neuron/" + mqttClientId + "/status", 1);
+            log.info("MQTT subscribed collector: {}", mqttClientId);
+        } catch (MqttException e) {
+            log.error("MQTT subscribe failed for {}: {}", mqttClientId, e.getMessage());
+            subscribedCollectors.remove(mqttClientId); // 允许下次重试
         }
     }
 
@@ -284,6 +313,9 @@ public class MqttSubscriberService {
             String[] segments = topic.split("/");
             if (segments.length < 3) return;
             String mqttClientId = segments[1];
+
+            // 首次见到此采集器 → 显式订阅（绕过 wildcard ACL 限制）
+            subscribeCollector(mqttClientId);
 
             Map<String, Object> data = objectMapper.readValue(payload, Map.class);
             String status = (String) data.getOrDefault("status", "online");
