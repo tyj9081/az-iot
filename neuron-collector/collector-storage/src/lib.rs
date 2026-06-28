@@ -15,7 +15,7 @@
 //! approach uses only pure Rust crates (serde_json) and is sufficient for the
 //! offline buffering use case in an MVP.
 
-use collector_model::AggregatedReading;
+use collector_model::{AggregatedReading, Device};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -222,6 +222,43 @@ impl LocalStorage {
     /// Total number of entries in the file.
     pub fn row_count(&self) -> anyhow::Result<usize> {
         Self::count_lines(&self.file_path)
+    }
+
+/// Default path for device registry persistence.
+pub const REGISTRY_PATH: &str = "devices.json";
+
+    // ─── Device Registry Persistence ─────────────────────
+
+    /// Save devices to the default registry file.
+    pub fn save_devices_static(devices: &[Device]) -> anyhow::Result<()> {
+        let json = serde_json::to_string_pretty(devices)?;
+        fs::write(REGISTRY_PATH, json)?;
+        Ok(())
+    }
+
+    /// Load persisted devices from the default registry file.
+    pub fn load_devices_static() -> Vec<Device> {
+        let path = Path::new(REGISTRY_PATH);
+        if !path.exists() {
+            tracing::info!("No persisted registry found, starting fresh");
+            return vec![];
+        }
+        match fs::read_to_string(path) {
+            Ok(json) => match serde_json::from_str::<Vec<Device>>(&json) {
+                Ok(devices) => {
+                    tracing::info!("Loaded {} devices from {}", devices.len(), REGISTRY_PATH);
+                    devices
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to parse {}: {}", REGISTRY_PATH, e);
+                    vec![]
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to read {}: {}", REGISTRY_PATH, e);
+                vec![]
+            }
+        }
     }
 
     fn count_lines(path: &Path) -> anyhow::Result<usize> {

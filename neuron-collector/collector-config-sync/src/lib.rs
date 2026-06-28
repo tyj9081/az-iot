@@ -1,7 +1,9 @@
 use collector_model::ConfigDelta;
-use collector_scheduler::Collector;
+use collector_scheduler::{Collector, DeviceRegistry};
+use collector_storage::LocalStorage;
 use collector_uploader::MqttUploadConfig;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub async fn run(collector: Collector, mqtt: MqttUploadConfig) {
@@ -10,6 +12,15 @@ pub async fn run(collector: Collector, mqtt: MqttUploadConfig) {
             tracing::warn!("Config sync stopped: {err}. Reconnecting in 5s");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
+    }
+}
+
+async fn save_registry(registry: &Arc<tokio::sync::RwLock<DeviceRegistry>>) {
+    let devices: Vec<_> = registry.read().await.devices.values().cloned().collect();
+    if let Err(e) = LocalStorage::save_devices_static(&devices) {
+        tracing::warn!("Failed to persist registry: {}", e);
+    } else if !devices.is_empty() {
+        tracing::info!("Registry persisted: {} devices", devices.len());
     }
 }
 
@@ -59,6 +70,8 @@ async fn apply_delta(collector: &Collector, delta: ConfigDelta) {
                     "Device registered: id={} code={} name={} protocol={} data_points={}",
                     id, code, name, protocol, dp_count
                 );
+                drop(registry);
+                save_registry(&collector.registry).await;
             } else {
                 tracing::warn!("Config delta action={} missing device", delta.action);
             }

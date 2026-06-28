@@ -4,6 +4,7 @@
 //! 启动调度器循环采集并上报。
 
 use collector_scheduler::*;
+use collector_storage::LocalStorage;
 use collector_uploader::{FallbackConfig, MqttUploadConfig, Uploader};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -31,8 +32,15 @@ async fn main() -> anyhow::Result<()> {
     let active = uploader.active_channel().await;
     tracing::info!("Collector initialized, active channel: {}", active);
 
-    // 设备注册表
-    let registry = Arc::new(RwLock::new(DeviceRegistry::new()));
+    // 设备注册表 — 优先从本地文件恢复
+    let mut registry = DeviceRegistry::new();
+    let persisted = LocalStorage::load_devices_static();
+    if !persisted.is_empty() {
+        for device in persisted {
+            registry.register(device);
+        }
+    }
+    let registry = Arc::new(RwLock::new(registry));
 
     // 启动采集器
     let collector = Collector::new(registry, uploader.clone());

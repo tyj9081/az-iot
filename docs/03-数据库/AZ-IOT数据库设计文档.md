@@ -120,6 +120,8 @@
 | created_at | DATETIME | NOT NULL | NOW() | |
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
 
+> ⚠️ **已知债务**: Java 实体 `SysRole.status` 为 `String`，但 DB 为 `TINYINT`。当前无写操作触发此字段，但后续若改 VARCHAR 需统一迁移。
+
 ---
 
 ### sys_permission
@@ -139,6 +141,8 @@
 | status | TINYINT | NOT NULL | 1 | 1=启用 0=停用 |
 | created_at | DATETIME | NOT NULL | NOW() | |
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
+
+> ⚠️ **已知债务**: Java 实体 `SysPermission.status` 为 `String`，DB 为 `TINYINT`。同 sys_role。
 
 ---
 
@@ -205,6 +209,7 @@
 - `INDEX idx_audit_log_operator (operator_id)`
 
 > 默认保留 180 天 (sys_config: `audit_log_retention_days=180`)。
+> ⚠️ **已知债务**: Java 实体 `SysAuditLog.status` 为 `String`，DB 为 `TINYINT`。写入依赖 DB 默认值，后续若改 VARCHAR 需统一迁移。
 
 ---
 
@@ -307,7 +312,6 @@
 | sort_order | INT | NOT NULL | 0 | 排序号 |
 | description | VARCHAR(256) | | NULL | 说明 |
 | extra_params | JSON | | NULL | 协议特定参数(MQTT topic/OPC UA node_id/SNMP OID等, V17) |
-| extra_params | JSON | | NULL | 协议特定参数(MQTT topic/OPC UA node_id等, V17) |
 | created_at | DATETIME | NOT NULL | NOW() | |
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
 
@@ -330,7 +334,7 @@
 | mqtt_client_id | VARCHAR(64) | UNIQUE NOT NULL | | MQTT Client ID |
 | ip_address | VARCHAR(45) | | NULL | 采集器IP |
 | collect_interval_sec | INT | NOT NULL | 900 | 采集间隔(秒) (V14迁入) |
-| **status (V18 变更)** ⚠️ | VARCHAR(16) | NOT NULL | 'offline' | offline / online / alarm |
+| status | VARCHAR(16) | NOT NULL | 'offline' | offline / online / alarm (V18: TINYINT→VARCHAR) |
 | firmware_version | VARCHAR(32) | | NULL | 固件版本 |
 | last_heartbeat | DATETIME | | NULL | 最后心跳时间 |
 | description | VARCHAR(512) | | NULL | 描述 |
@@ -344,7 +348,7 @@
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
 
 > ⚠️ V14 之前 `collect_interval_sec` 可能存在旧版本未执行迁移的风险。
-> ⚠️ **V18 迁移**: `status` 字段从 `TINYINT(0/1/2)` 改为 `VARCHAR(16) (offline/online/alarm)`，与 `dev_device.status` 对齐。
+> **V18**: `status` 已从 `TINYINT(0/1/2)` 改为 `VARCHAR(16) (offline/online/alarm)`，与 `dev_device.status` 统一。
 
 ---
 
@@ -378,13 +382,13 @@
 | 字段 | 类型 | 键 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | id | BIGINT | PK AUTO | | 主键 |
-| serial_port_id | BIGINT | NOT NULL | | FK → dev_serial_port.id |
+| serial_port_id | BIGINT | | **NULL** | FK → dev_serial_port.id (TCP协议可为NULL, V19) |
 | model_id | BIGINT | NOT NULL | | FK → dev_device_model.id |
 | code | VARCHAR(64) | UNIQUE NOT NULL | | 设备编号 |
 | name | VARCHAR(128) | NOT NULL | | 设备名称 |
 | slave_addr | INT | NOT NULL | 1 | Modbus 从站地址 |
 | collect_interval_sec | INT | | NULL | 采集间隔(秒)，NULL=使用采集器级别 |
-| **status (V16 变更)** ⚠️ | VARCHAR(16) | NOT NULL | 'offline' | offline / online / alarm / disabled |
+| status | VARCHAR(16) | NOT NULL | 'offline' | offline / online / alarm / disabled (V16: TINYINT→VARCHAR) |
 | location | VARCHAR(256) | | NULL | 安装位置 |
 | description | VARCHAR(512) | | NULL | 设备描述 |
 | is_deleted | TINYINT | NOT NULL | 0 | 逻辑删除 (@TableLogic) |
@@ -397,7 +401,7 @@
 - `INDEX idx_device_port (serial_port_id)`
 - `INDEX idx_device_model (model_id)`
 
-> ⚠️ **V16 迁移**: `status` 字段从 `TINYINT(0/1/2/3)` 改为 `VARCHAR(16) (offline/online/alarm/disabled)`，旧数据可能有残留数值需手动清理。
+> **V16**: `status` 已从 `TINYINT(0/1/2/3)` 改为 `VARCHAR(16) (offline/online/alarm/disabled)`。
 
 ---
 
@@ -440,6 +444,7 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 
 > ⚠️ **运维提醒**: 每月需新增下月分区 + 按 `data_retention_days`(默认90天) 清理过期分区。
 > 默认保留 90 天 (sys_config: `data_retention_days=90`)。
+> ⚠️ **已知债务**: Java 实体 `DevDeviceReading.quality` 为 `String`，DB 为 `TINYINT`。当前写 `"0"` 由 MySQL 隐式转换，后续若改 VARCHAR 需统一迁移。
 
 ---
 
@@ -567,6 +572,19 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | ADR-07 | dev_collector MQTT 认证分离 | V11 为每个采集器独立存储 MQTT 凭证，支持 TLS |
 | ADR-08 | 协议编码与 Rust 枚举编译期对齐 | dev_protocol.code 在 V16 中与采集端 ProtocolType 严格一致 |
 | ADR-09 | TCP 协议使用 extra_params JSON | dev_register_map 新增加 extra_params 字段，支持 MQTT topic/node_id、OPC UA node_id、SNMP OID 等协议差异化参数 |
+| ADR-10 | collector.status V18 改为 VARCHAR | 与 dev_device.status (V16) 保持一致，统一使用可读字符串 `offline/online/alarm`，采集器侧（Rust）MQTT payload 即报告字符串，无需中间转换 |
+| ADR-11 | sys_role/sys_permission/sys_auditLog/reading.quality 待统一 | 4 处 Java String↔DB TINYINT 不一致，当前无运行时错误但为设计债务，后续应走 V20 迁移统一为 VARCHAR 语义字符串 |
+
+---
+
+## 已知债务（待迁移）
+
+| # | 表 | 列 | DB 类型 | Java 类型 | 风险 | 建议 |
+|---|-----|------|---------|----------|------|------|
+| 1 | sys_role | status | TINYINT | String | 代码只读，读到 "1"/"0" | V20: TINYINT→VARCHAR(16) `enabled`/`disabled` |
+| 2 | sys_permission | status | TINYINT | String | 同上 | 同上 |
+| 3 | sys_audit_log | status | TINYINT | String | 插入用 DB 默认值 | V20: TINYINT→VARCHAR(16) `success`/`failure` |
+| 4 | dev_device_reading | quality | TINYINT | String | 写 "0" MySQL 隐式转换 | V20: TINYINT→VARCHAR(16) `normal`/`timeout`/`abnormal`/`sensor_fault` |
 
 ---
 
@@ -585,5 +603,6 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | 2026-06-27 | V16 | 设备状态改为 VARCHAR + 协议编码对齐 |
 | 2026-06-28 | V17 | register_map 增加 extra_params JSON 列 (TCP 协议支持) |
 | 2026-06-28 | V18 | collector.status TINYINT → VARCHAR (与 device 对齐) |
+| 2026-06-28 | V19 | device.serial_port_id 改为 NULLABLE (TCP协议设备无需串口) |
 
-> **V12 已跳过**，V17~V18 为 2026-06-28 新增。
+> **V12 已跳过**。**V18** 因 Flyway 未自动执行需手动补跑迁移 SQL；**V19** 需同步确认已应用。

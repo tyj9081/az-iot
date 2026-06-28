@@ -77,13 +77,28 @@ impl Collector {
             self.uploader.active_channel().await
         );
 
+        let mut tick = 0u64;
         loop {
             let devices: Vec<Device> = {
                 let registry = self.registry.read().await;
                 registry.devices.values().cloned().collect()
             };
 
+            // 心跳日志, 每 10 个周期 (≈10s) 打印一次设备数
+            tick += 1;
+            if tick % 10 == 1 || !devices.is_empty() {
+                tracing::info!(
+                    "Scheduler tick={} devices={}",
+                    tick,
+                    devices.len()
+                );
+            }
+
             for device in devices {
+                let dev_id = device.id;
+                let dev_proto = device.protocol.display_name().to_string();
+                tracing::info!("Collecting device {} protocol={}", dev_id, dev_proto);
+
                 let driver = match DriverFactory::create(&device) {
                     Some(d) => d,
                     None => {
@@ -116,6 +131,8 @@ impl Collector {
                         let count = values.len();
                         if count > 0 {
                             tracing::info!("Device {} collected {} data points", device.id, count);
+                        } else {
+                            tracing::warn!("Device {} collect returned 0 data points", device.id);
                         }
                         for point in &device.data_points {
                             if let Some(value) = values.get(&point.sensor_code) {
