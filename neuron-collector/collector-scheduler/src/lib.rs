@@ -115,6 +115,13 @@ impl Collector {
             // ── 串口可用性预检 ──────────────────────────
             // 对新出现或重启后未探过的串口设备，做一次快速端口打开测试。
             // 通过则静默记录，失败则立刻以 ERROR 级别告警。
+            //
+            // ⚠️ 关键：probe 和 collect 不能在同一次迭代中对同一设备执行。
+            //   Windows 串口句柄释放不是瞬时的，probe 打开→关闭后
+            //   collect 立刻再打开会触发 "拒绝访问"(Access Denied)，
+            //   device 陷入持续失败链。
+            //   因此：probe 通过的设备，跳过本轮采集，下一轮再做。
+            let mut just_probed: HashSet<i64> = HashSet::new();
             for device in &devices {
                 if probed_devices.contains(&device.id) {
                     continue;
@@ -126,6 +133,7 @@ impl Collector {
                                 "Port probe OK  device={} port={} protocol={}",
                                 device.id, port_name, device.protocol.code()
                             );
+                            just_probed.insert(device.id);
                         }
                         Err(e) => {
                             tracing::error!(
@@ -140,6 +148,13 @@ impl Collector {
 
             for device in devices {
                 let dev_id = device.id;
+
+                // 跳过本轮刚探完的设备，给 Windows 串口释放留出时间
+                if just_probed.contains(&dev_id) {
+                    tracing::debug!("Device {} skipped this tick (port just probed)", dev_id);
+                    continue;
+                }
+
                 let proto = device.protocol.code().to_string();
                 let start = Instant::now();
 
