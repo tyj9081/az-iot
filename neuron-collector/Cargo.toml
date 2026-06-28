@@ -10,6 +10,7 @@ members = [
     "collector-telemetry",
     "collector-uploader",
     "collector-bin",
+    "collector-debug",
 ]
 
 [workspace.dependencies]

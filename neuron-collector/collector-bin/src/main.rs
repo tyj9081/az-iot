@@ -3,6 +3,7 @@
 //! 从 config.toml 加载配置, 初始化 MQTT/WS 双通道 Uploader,
 //! 启动调度器循环采集并上报。
 
+use clap::{Parser, Subcommand};
 use collector_scheduler::*;
 use collector_storage::LocalStorage;
 use collector_telemetry::Telemetry;
@@ -13,12 +14,72 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
+/// AZ-IOT Collector — 工业园区/楼宇能源数据采集器
+#[derive(Parser)]
+#[command(name = "neuron-collector", version = "1.0.0")]
+struct Cli {
+    /// 详细日志输出 (debug 级别, 可看到 TX/RX 字节等细节)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// 启动调试控制台 (交互式设备调测)
+    Debug {
+        /// 设备配置文件路径 (默认: devices.json)
+        #[arg(short, long)]
+        file: Option<String>,
+    },
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    // 调试命令 — 走独立路径
+    if let Some(Commands::Debug { file }) = cli.command {
+        tracing_subscriber::fmt()
+            .with_ansi(true)
+            .with_env_filter(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new("debug")),
+            )
+            .with_target(false)
+            .init();
+        return collector_debug::run(file.as_deref());
+    }
+
+    // ─── 正常采集模式 ───────────────────────────────────
+    let filter = if cli.verbose {
+        // -v: 默认 debug 级别, 仍可被 RUST_LOG 覆盖
+        EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| EnvFilter::new("debug"))
+    } else {
+        // 默认: 服从 RUST_LOG, 未设置时 info 级别
+        EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| EnvFilter::new("info"))
+    };
+
+    // 自动检测终端 ANSI 支持 (Win10+ Terminal / ConPTY 支持彩色)
+    let use_ansi = std::env::var("NO_COLOR").is_err()
+        && std::env::var("TERM").unwrap_or_default() != "dumb"
+        && !std::env::var("RUST_LOG_STYLE")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("never");
+
     tracing_subscriber::fmt()
-        .with_ansi(false) // Windows 终端兼容
-        .with_env_filter(EnvFilter::from_default_env())  // 支持 RUST_LOG 环境变量
+        .with_ansi(use_ansi)
+        .with_env_filter(filter)
+        .with_target(cli.verbose) // verbose 模式下显示模块路径
         .init();
+
+    if cli.verbose {
+        tracing::info!("Verbose mode enabled (debug level logging)");
+    }
     tracing::info!("AZ-IOT Collector v1.0.0 starting...");
 
     // 加载配置 (默认值, 生产环境从 config.toml 读取)

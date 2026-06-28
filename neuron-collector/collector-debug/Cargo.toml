@@ -1,0 +1,15 @@
+[package]
+name = "collector-debug"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive TUI debug console for AZ-IOT Collector"
+
+[dependencies]
+collector-model = { path = "../collector-model" }
+collector-driver = { path = "../collector-driver" }
+dialoguer = "0.11"
+console = "0.15"
+tokio = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }

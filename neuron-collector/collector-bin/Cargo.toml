@@ -15,6 +15,7 @@ collector-uploader = { path = "../collector-uploader" }
 collector-config-sync = { path = "../collector-config-sync" }
 collector-storage = { path = "../collector-storage" }
 collector-telemetry = { path = "../collector-telemetry" }
+collector-debug = { path = "../collector-debug" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -26,3 +27,4 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 reqwest = { workspace = true }
 url = "2"
+clap = { version = "4", features = ["derive"] }

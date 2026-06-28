@@ -1,4 +1,5 @@
 [build]
-target-dir = "D:/cargo-target"
+# target-dir = "D:/cargo-target"
+
 
 

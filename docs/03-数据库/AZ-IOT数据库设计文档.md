@@ -573,7 +573,7 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | ADR-08 | 协议编码与 Rust 枚举编译期对齐 | dev_protocol.code 在 V16 中与采集端 ProtocolType 严格一致 |
 | ADR-09 | TCP 协议使用 extra_params JSON | dev_register_map 新增加 extra_params 字段，支持 MQTT topic/node_id、OPC UA node_id、SNMP OID 等协议差异化参数 |
 | ADR-10 | collector.status V18 改为 VARCHAR | 与 dev_device.status (V16) 保持一致，统一使用可读字符串 `offline/online/alarm`，采集器侧（Rust）MQTT payload 即报告字符串，无需中间转换 |
-| ADR-11 | sys_role/sys_permission/sys_auditLog/reading.quality 待统一 | 4 处 Java String↔DB TINYINT 不一致，当前无运行时错误但为设计债务，后续应走 V20 迁移统一为 VARCHAR 语义字符串 |
+| ADR-11 | sys_role/sys_permission/sys_auditLog/reading.quality 待统一 | 4 处 Java String↔DB TINYINT 不一致。quality 已修复 (Java Integer→TINYINT)，剩余 3 处当前无运行时错误但为设计债务，后续应走 V20 迁移统一 |
 
 ---
 
@@ -584,7 +584,7 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | 1 | sys_role | status | TINYINT | String | 代码只读，读到 "1"/"0" | V20: TINYINT→VARCHAR(16) `enabled`/`disabled` |
 | 2 | sys_permission | status | TINYINT | String | 同上 | 同上 |
 | 3 | sys_audit_log | status | TINYINT | String | 插入用 DB 默认值 | V20: TINYINT→VARCHAR(16) `success`/`failure` |
-| 4 | dev_device_reading | quality | TINYINT | String | 写 "0" MySQL 隐式转换 | V20: TINYINT→VARCHAR(16) `normal`/`timeout`/`abnormal`/`sensor_fault` |
+| 4 | dev_device_reading | quality | TINYINT | Integer | ✅ 已修复 (P1-011) | — |
 
 ---
 
