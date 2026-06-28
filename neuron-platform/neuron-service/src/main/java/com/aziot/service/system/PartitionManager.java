@@ -39,6 +39,12 @@ public class PartitionManager {
         String partitionName = "p" + nextMonthFirst.format(YM);
         String lessThanDate = nextMonthFirst.format(DATE);
 
+        // Validate partition name format to prevent injection
+        if (!partitionName.matches("p\\d{6}")) {
+            log.error("Invalid partition name format: {}", partitionName);
+            return;
+        }
+
         String sql = String.format(
             "ALTER TABLE dev_device_reading " +
             "REORGANIZE PARTITION p_future INTO (" +

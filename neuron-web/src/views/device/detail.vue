@@ -302,8 +302,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed, reactive } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { readingApi } from '@/api/reading'
 import { deviceApi } from '@/api/device'
@@ -312,6 +312,7 @@ import { instructionApi } from '@/api/device-instruction'
 import { useRealtime } from '@/composables/useRealtime'
 
 const route = useRoute()
+const router = useRouter()
 const deviceId = Number(route.params.id)
 const realtime = useRealtime()
 
@@ -383,7 +384,14 @@ const onAlarmTypeChange = () => { alarmForm.params = {} }
 
 const formatAlarmParams = (type: string, params: any) => {
   if (!params) return '-'
-  const p = typeof params === 'string' ? JSON.parse(params) : params
+  if (typeof params !== 'string') return params
+  let p: any
+  try {
+    p = JSON.parse(params)
+  } catch {
+    console.warn('Failed to parse alarm params:', params)
+    return {}
+  }
   switch(type) {
     case 'limit_upper': return `上限 ${p.max}`
     case 'limit_lower': return `下限 ${p.min}`
@@ -444,7 +452,11 @@ const saveAlarm = async () => {
 }
 
 const deleteAlarm = async (row: any) => {
-  await ElMessageBox.confirm('确认删除此告警规则?', '删除确认', { type: 'warning' })
+  try {
+    await ElMessageBox.confirm('确认删除此告警规则?', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
   try {
     await alarmConfigApi.remove(deviceId, row.alarmType, row.sensorCode)
     ElMessage.success('已删除')
@@ -519,12 +531,21 @@ const saveInstruction = async () => {
 }
 
 const deleteInstruction = async (row: any) => {
-  await ElMessageBox.confirm('确认删除此指令?', '删除确认', { type: 'warning' })
+  try {
+    await ElMessageBox.confirm('确认删除此指令?', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
   try { await instructionApi.remove(deviceId, row.id); ElMessage.success('已删除'); await loadInstructions() }
   catch {}
 }
 
 onMounted(async () => {
+  if (!route.params.id || isNaN(Number(route.params.id))) {
+    ElMessage.error('无效的设备ID参数')
+    router.push('/device')
+    return
+  }
   loading.value = true
   realtime.connect()
   try {
@@ -540,6 +561,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  realtime.disconnect()
 })
 </script>
 

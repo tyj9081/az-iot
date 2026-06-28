@@ -9,16 +9,12 @@ const request: AxiosInstance = axios.create({
 
 // 防止多个并发请求同时触发刷新
 let isRefreshing = false
-let pendingRequests: Array<(token: string) => void> = []
 
-function onRefreshed(newToken: string) {
-  pendingRequests.forEach(cb => cb(newToken))
-  pendingRequests = []
+interface PendingRequest {
+  resolve: (token: string) => void
+  reject: (error: Error) => void
 }
-
-function addPendingRequest(cb: (token: string) => void) {
-  pendingRequests.push(cb)
-}
+let pendingRequests: PendingRequest[] = []
 
 request.interceptors.request.use(config => {
   const token = localStorage.getItem('access_token')
@@ -47,20 +43,32 @@ request.interceptors.response.use(
             const newToken = await authStore.refreshAccessToken()
 
             if (newToken) {
-              onRefreshed(newToken)
               isRefreshing = false
-              // 用新 token 重放原请求
-              originalRequest.headers.Authorization = `Bearer ${newToken}`
+              // Replay all queued requests with new token
+              pendingRequests.forEach(({ resolve }) => {
+                resolve(newToken)
+              })
+              pendingRequests = []
+              // Retry the original request
+              originalRequest.headers!.Authorization = `Bearer ${newToken}`
               return request(originalRequest)
             }
 
             // 刷新失败，跳转登录
             isRefreshing = false
+            // Reject all queued requests before clearing
+            pendingRequests.forEach(({ reject }) => {
+              reject(new Error('Token refresh failed, please login again'))
+            })
             pendingRequests = []
             window.location.href = '/login'
             return Promise.reject(error)
           } catch {
             isRefreshing = false
+            // Reject all queued requests before clearing
+            pendingRequests.forEach(({ reject }) => {
+              reject(new Error('Token refresh failed, please login again'))
+            })
             pendingRequests = []
             window.location.href = '/login'
             return Promise.reject(error)
@@ -68,10 +76,13 @@ request.interceptors.response.use(
         } else {
           // 已有刷新在进行中，排队等待
           originalRequest._retry = true
-          return new Promise(resolve => {
-            addPendingRequest((newToken: string) => {
-              originalRequest.headers.Authorization = `Bearer ${newToken}`
-              resolve(request(originalRequest))
+          return new Promise((resolve, reject) => {
+            pendingRequests.push({
+              resolve: (newToken: string) => {
+                originalRequest.headers!.Authorization = `Bearer ${newToken}`
+                resolve(request(originalRequest))
+              },
+              reject
             })
           })
         }

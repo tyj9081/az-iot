@@ -39,11 +39,10 @@ async fn mb_collect_async(
                         coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
                     }
                     Err(exception) => {
-                        tracing::warn!(
+                        return Err(anyhow::anyhow!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
                             fc, addr, count, exception
-                        );
-                        Vec::new()
+                        ));
                     }
                 }
             }
@@ -59,11 +58,10 @@ async fn mb_collect_async(
                         data
                     }
                     Err(exception) => {
-                        tracing::warn!(
+                        return Err(anyhow::anyhow!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
                             fc, addr, count, exception
-                        );
-                        Vec::new()
+                        ));
                     }
                 }
             }
@@ -79,11 +77,10 @@ async fn mb_collect_async(
                         data
                     }
                     Err(exception) => {
-                        tracing::warn!(
+                        return Err(anyhow::anyhow!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
                             fc, addr, count, exception
-                        );
-                        Vec::new()
+                        ));
                     }
                 }
             }

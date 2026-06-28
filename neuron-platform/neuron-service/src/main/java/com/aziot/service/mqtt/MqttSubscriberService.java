@@ -64,6 +64,9 @@ public class MqttSubscriberService {
     @Value("${app.mqtt.connection-timeout-seconds:30}")
     private int connTimeout;
 
+    @Value("${app.mqtt.enabled:true}")
+    private boolean mqttEnabled;
+
     private volatile IMqttAsyncClient client;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -97,7 +100,12 @@ public class MqttSubscriberService {
 
     @PostConstruct
     public void init() {
-        start();
+        if (!mqttEnabled) {
+            log.info("MQTT subscriber disabled by configuration");
+            return;
+        }
+        // Start MQTT connection asynchronously to avoid blocking Spring startup
+        new Thread(this::start, "mqtt-subscriber-init").start();
     }
 
     @PreDestroy
@@ -254,6 +262,15 @@ public class MqttSubscriberService {
             markDeviceOnline(deviceId);
         } catch (Exception e) {
             log.error("MQTT message handle failed topic={}: {}", topic, e.getMessage());
+            // Retry once after 100ms
+            try {
+                Thread.sleep(100);
+                handleMessage(topic, message);
+            } catch (Exception retryEx) {
+                log.error("MQTT message retry also failed topic={}, payload will be dropped. Error: {}", 
+                    topic, retryEx.getMessage());
+                // TODO: implement dead letter queue for critical message recovery
+            }
         }
     }
 

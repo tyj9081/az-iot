@@ -254,8 +254,20 @@ impl CollectorConfig {
             tracing::warn!("config.toml not found, using defaults");
             return None;
         }
-        let content = std::fs::read_to_string(path).ok()?;
-        let parsed: toml::Value = content.parse().ok()?;
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("Failed to read config.toml: {}", e);
+                return None;
+            }
+        };
+        let parsed: toml::Value = match content.parse() {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("Failed to parse config.toml: {}", e);
+                return None;
+            }
+        };
 
         let mqtt = MqttUploadConfig {
             broker: parsed.get("mqtt")?.get("broker")?.as_str()?.to_string(),

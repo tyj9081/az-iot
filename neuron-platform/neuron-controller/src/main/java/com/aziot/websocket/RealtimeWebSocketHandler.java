@@ -92,11 +92,9 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
             for (WebSocketSession session : sessions.values()) {
                 if (session.isOpen()) {
                     try {
-                        synchronized (session) {
-                            session.sendMessage(message);
-                        }
+                        session.sendMessage(message);
                     } catch (IOException e) {
-                        log.warn("WebSocket send failed: sessionId={}", session.getId());
+                        // Session may have closed between isOpen check and send
                         deadSessions.add(session.getId());
                     }
                 } else {

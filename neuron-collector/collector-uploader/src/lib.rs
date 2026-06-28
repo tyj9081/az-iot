@@ -363,9 +363,13 @@ impl Uploader {
         };
 
         // 将 ws:// 转为 http:// 用于实际传输
-        let http_url = self.fallback_config.ws_url
-            .replace("ws://", "http://")
-            .replace("wss://", "https://");
+        let http_url = if let Some(rest) = self.fallback_config.ws_url.strip_prefix("ws://") {
+            format!("http://{}", rest)
+        } else if let Some(rest) = self.fallback_config.ws_url.strip_prefix("wss://") {
+            format!("https://{}", rest)
+        } else {
+            self.fallback_config.ws_url.clone()
+        };
 
         if *self.ws_connected.read().await {
             match reqwest::Client::new()

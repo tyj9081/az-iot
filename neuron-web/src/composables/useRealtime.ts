@@ -23,13 +23,15 @@ let singleton: ReturnType<typeof createRealtime> | null = null
 function createRealtime() {
   const latestData = shallowRef<Map<number, Map<string, RealtimePoint>>>(new Map())
   const connected = ref(false)
-  const lastDataTimestamps = new Map<number, number>()
+  const lastDataTimestamps = ref(new Map<number, number>())
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let manualClose = false
+  let connectCount = 0
 
   function connect() {
+    connectCount++
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
 
     manualClose = false
@@ -55,7 +57,7 @@ function createRealtime() {
             }
             const deviceMap = newMap.get(point.deviceId)!
             deviceMap.set(point.sensorCode, point)
-            lastDataTimestamps.set(point.deviceId, now)
+            lastDataTimestamps.value.set(point.deviceId, now)
           }
 
           latestData.value = newMap
@@ -80,13 +82,17 @@ function createRealtime() {
   }
 
   function disconnect() {
+    connectCount--
+    if (connectCount > 0) return // Still has active consumers
     manualClose = true
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
-    ws?.close()
-    ws = null
+    if (ws) {
+      ws.close()
+      ws = null
+    }
     connected.value = false
   }
 
@@ -94,7 +100,7 @@ function createRealtime() {
    * 判断设备是否在线：最近 30 秒内有实时数据
    */
   function isDeviceOnline(deviceId: number): boolean {
-    const ts = lastDataTimestamps.get(deviceId)
+    const ts = lastDataTimestamps.value.get(deviceId)
     if (!ts) return false
     return Date.now() - ts < 30_000
   }
@@ -105,7 +111,7 @@ function createRealtime() {
   function getOnlineDeviceCount(): number {
     const now = Date.now()
     let count = 0
-    lastDataTimestamps.forEach((ts) => {
+    lastDataTimestamps.value.forEach((ts) => {
       if (now - ts < 30_000) count++
     })
     return count

@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RealtimeCache {
 
     /** device_id -> sensor_code -> RealtimeValue */
+    // TODO: add scheduled eviction for entries older than 30 minutes to prevent OOM on long-running instances
     private final ConcurrentHashMap<Long, ConcurrentHashMap<String, RealtimeValue>> cache = new ConcurrentHashMap<>();
 
     /**
@@ -55,6 +56,27 @@ public class RealtimeCache {
      */
     public List<Long> getActiveDeviceIds() {
         return new ArrayList<>(cache.keySet());
+    }
+
+    /**
+     * Remove cached data for a device (call when device is deleted).
+     */
+    public void removeDevice(Long deviceId) {
+        cache.remove(deviceId);
+    }
+
+    /**
+     * Clear all cached data.
+     */
+    public void clear() {
+        cache.clear();
+    }
+
+    /**
+     * Get current cache size for monitoring.
+     */
+    public int size() {
+        return cache.size();
     }
 
     @Data

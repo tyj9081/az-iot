@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -246,21 +246,45 @@ async function handleSubmit() {
   } finally { submitLoading.value = false }
 }
 async function handleDelete(row: any) {
-  await ElMessageBox.confirm('确定删除该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
-  await deviceApi.remove(row.id); ElMessage.success('删除成功'); fetchList()
+  try {
+    await ElMessageBox.confirm('确定删除该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+  } catch {
+    return // User cancelled
+  }
+  try {
+    await deviceApi.remove(row.id)
+    ElMessage.success('删除成功')
+    fetchList()
+  } catch {
+    ElMessage.error('删除失败')
+  }
 }
 async function handleDisable(row: any) {
   const targetStatus = row.status === 'disabled' ? (row._prevStatus || 'offline') : 'disabled'
   const label = targetStatus === 'disabled' ? '禁用' : '启用'
-  await ElMessageBox.confirm('确定' + label + '该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+  try {
+    await ElMessageBox.confirm('确定' + label + '该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+  } catch {
+    return // User cancelled
+  }
   if (row.status !== 'disabled') row._prevStatus = row.status
-  await deviceApi.updateStatus(row.id, targetStatus); ElMessage.success(label + '成功'); fetchList()
+  try {
+    await deviceApi.updateStatus(row.id, targetStatus)
+    ElMessage.success(label + '成功')
+    fetchList()
+  } catch {
+    ElMessage.error(label + '失败')
+  }
 }
 async function handlePushConfig(row: any) {
   try { await deviceApi.pushConfig(row.id); ElMessage.success('配置下发中，采集端将自动接收') }
   catch { ElMessage.error('下发失败，请检查 MQTT 连接') }
 }
 onMounted(() => { fetchCollectorOptions(); fetchModelOptions(); fetchList(); realtime.connect() })
+
+onUnmounted(() => {
+  realtime.disconnect()
+})
 </script>
 
 <style scoped>

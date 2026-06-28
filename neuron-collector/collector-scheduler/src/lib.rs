@@ -2,7 +2,7 @@ use collector_driver::DriverFactory;
 use collector_model::{Device, LatestReading};
 use collector_reporter::{Aggregator, AlarmEngine};
 use collector_uploader::Uploader;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
@@ -95,6 +95,16 @@ impl Collector {
                 registry.devices.values().cloned().collect()
             };
 
+            // Cleanup stale aggregators and alarm engines for removed devices
+            {
+                let current_ids: HashSet<i64> = devices.iter().map(|d| d.id).collect();
+                let mut aggs = self.aggregators.lock().await;
+                aggs.retain(|id, _| current_ids.contains(id));
+                drop(aggs);
+                let mut engines = self.alarm_engines.lock().await;
+                engines.retain(|id, _| current_ids.contains(id));
+            }
+
             // 心跳日志, 每 30 秒打印一次设备数（无设备时减少噪音）
             tick += 1;
             if devices.is_empty() && tick % 30 == 1 {
@@ -143,8 +153,10 @@ impl Collector {
                         Err(err) => {
                             let error_type = if err.downcast_ref::<std::io::Error>().is_some() {
                                 "io_error"
+                            } else if err.downcast_ref::<serde_json::Error>().is_some() {
+                                "parse_error"  
                             } else {
-                                "io_error"
+                                "unknown_error"
                             };
                             PollOutcome::Failure { error_type }
                         }
@@ -254,6 +266,7 @@ impl Collector {
                     let mut aggs = self.aggregators.lock().await;
                     let aggregator = aggs
                         .entry(device.id)
+                        .and_modify(|a| *a = Aggregator::new(device.id, 60))
                         .or_insert_with(|| Aggregator::new(device.id, 60));
                     let now_ts = chrono::Utc::now().timestamp();
                     for point in &device.data_points {
@@ -288,37 +301,45 @@ impl Collector {
 
                 // ── 告警检测 ────────────────────────────
                 {
-                    let mut engines = self.alarm_engines.lock().await;
-                    let alarm_engine = engines
-                        .entry(device.id)
-                        .or_insert_with(|| AlarmEngine::new(&device.alarm_config));
+                    let payload_to_send: Vec<(String, String)> = {
+                        let mut engines = self.alarm_engines.lock().await;
+                        let alarm_engine = engines
+                            .entry(device.id)
+                            .and_modify(|e| *e = AlarmEngine::new(&device.alarm_config))
+                            .or_insert_with(|| AlarmEngine::new(&device.alarm_config));
 
-                    for point in &device.data_points {
-                        if let Some(value) = values.get(&point.sensor_code) {
-                            if let Some(event) = alarm_engine.check(&device, &point.sensor_code, *value) {
-                                let client_id = self.uploader.client_id();
-                                let topic = format!(
-                                    "{}/{}/alarm",
-                                    "neuron", client_id
-                                );
-                                match serde_json::to_string(&event) {
-                                    Ok(payload) => {
-                                        self.uploader.publish_raw(&topic, &payload).await;
-                                        tracing::warn!(
-                                            "Alarm triggered: device={} sensor={} level={}",
-                                            event.device_id,
-                                            event.sensor_code,
-                                            event.level
-                                        );
-                                    }
-                                    Err(e) => {
-                                        tracing::error!(
-                                            "Serialize AlarmEvent error: {}", e
-                                        );
+                        let mut to_send = Vec::new();
+                        for point in &device.data_points {
+                            if let Some(value) = values.get(&point.sensor_code) {
+                                if let Some(event) = alarm_engine.check(&device, &point.sensor_code, *value) {
+                                    let client_id = self.uploader.client_id();
+                                    let topic = format!(
+                                        "{}/{}/alarm",
+                                        "neuron", client_id
+                                    );
+                                    match serde_json::to_string(&event) {
+                                        Ok(payload) => {
+                                            tracing::warn!(
+                                                "Alarm triggered: device={} sensor={} level={}",
+                                                event.device_id,
+                                                event.sensor_code,
+                                                event.level
+                                            );
+                                            to_send.push((topic, payload));
+                                        }
+                                        Err(e) => {
+                                            tracing::error!(
+                                                "Serialize AlarmEvent error: {}", e
+                                            );
+                                        }
                                     }
                                 }
                             }
                         }
+                        to_send
+                    }; // lock released here
+                    for (topic, payload) in payload_to_send {
+                        self.uploader.publish_raw(&topic, &payload).await;
                     }
                 }
             }

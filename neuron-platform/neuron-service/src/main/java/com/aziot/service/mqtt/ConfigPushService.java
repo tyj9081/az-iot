@@ -106,10 +106,18 @@ public class ConfigPushService {
             if (port != null) collector = collectorMapper.selectById(port.getCollectorId());
         }
 
-        // 网络协议设备无串口，取第一个采集器作为下发通道
+        // 网络协议设备无串口，需要显式绑定采集器
         if (collector == null) {
+            log.warn("Device {} is network-protocol device with no collector binding. " +
+                     "Config push may go to wrong collector in multi-collector setup. " +
+                     "Falling back to first available collector as best-effort.", deviceId);
             var list = collectorMapper.selectList(null);
-            if (list != null && !list.isEmpty()) collector = list.get(0);
+            if (list != null && !list.isEmpty()) {
+                collector = list.get(0);
+            } else {
+                log.error("No collector available for device {}, config push aborted", deviceId);
+                return null;
+            }
         }
         if (collector == null) return null;
 
@@ -190,10 +198,29 @@ public class ConfigPushService {
         } else if ("tcp".equals(busType)) {
             // TCP 网络协议: Modbus TCP, BACnet/IP, OPC UA, IEC 104, DNP3, S7, FINS,
             //                EtherNet/IP, Mitsubishi MC, SNMP, HTTP JSON
-            // KNOWN_LIMITATION: port 硬编码 502，后续应按协议映射默认端口 (ADDR-later)
             Map<String, Object> tcpBus = new LinkedHashMap<>();
             tcpBus.put("host", nvl(ctx.collector.getIpAddress(), "127.0.0.1"));
-            tcpBus.put("port", 502);
+
+            // Protocol default port mapping
+            int defaultPort = switch (protocolCode) {
+                case "MODBUS_TCP" -> 502;
+                case "BACNET_IP" -> 47808;
+                case "OPC_UA" -> 4840;
+                case "SNMP" -> 161;
+                case "HTTP_JSON" -> 80;
+                case "HTTPS_JSON" -> 443;
+                case "IEC_104" -> 2404;
+                case "DNP3_TCP" -> 20000;
+                case "S7" -> 102;
+                case "FINS_TCP" -> 9600;
+                case "ETHERNET_IP" -> 44818;
+                case "MITSUBISHI_MC" -> 5000;
+                default -> {
+                    log.warn("Unknown TCP protocol {}, defaulting port to 502", protocolCode);
+                    yield 502;
+                }
+            };
+            tcpBus.put("port", defaultPort);
             bus.put("tcp", tcpBus);
         } else {
             // serial 协议: Modbus RTU, DL/T645, IEC 101, CAN Bus, PROFIBUS, HostLink

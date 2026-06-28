@@ -213,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { dashboardApi } from '@/api/dashboard'
 import { deviceApi } from '@/api/device'
@@ -341,6 +341,10 @@ onMounted(async () => {
     loading.value = false
   }
   realtime.connect()
+})
+
+onUnmounted(() => {
+  realtime.disconnect()
 })
 </script>
 
