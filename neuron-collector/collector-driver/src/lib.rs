@@ -58,39 +58,34 @@ pub(crate) fn driver_runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-/// 串口可用性预检 — 在采集循环开始前快速验证端口是否存在。
+/// 串口可用性预检（异步版本）— 调度器在 async context 中直接 await，
+/// 不走 block_on，避免 "Cannot start a runtime from within a runtime" panic。
 ///
 /// 流程：打开串口 → 立即关闭。不进行任何读写操作。
-/// 超时 500ms，避免阻塞调度器主循环过久。
-/// 失败原因会被 anyhow context 包装后返回。
-pub fn probe_serial(port_name: &str, bus_param: &BusParam) -> Result<()> {
-    let port_name = port_name.to_string();
-    let bus_param = bus_param.clone();
-    let rt = driver_runtime();
-    rt.block_on(async move {
-        let builder = tokio_serial::new(&port_name, bus_param.baud)
-            .data_bits(match bus_param.data_bits {
-                5 => tokio_serial::DataBits::Five,
-                6 => tokio_serial::DataBits::Six,
-                7 => tokio_serial::DataBits::Seven,
-                _ => tokio_serial::DataBits::Eight,
-            })
-            .parity(match bus_param.parity.as_str() {
-                "odd" => tokio_serial::Parity::Odd,
-                "even" => tokio_serial::Parity::Even,
-                _ => tokio_serial::Parity::None,
-            })
-            .stop_bits(match bus_param.stop_bits {
-                2 => tokio_serial::StopBits::Two,
-                _ => tokio_serial::StopBits::One,
-            })
-            .timeout(Duration::from_millis(500));
-        let _port = builder
-            .open_native_async()
-            .with_context(|| format!("Probe serial port {port_name}"))?;
-        // 端口打开成功，立即 drop 关闭
-        Ok::<_, anyhow::Error>(())
-    })
+/// 超时 500ms，保证快速失败。
+pub async fn probe_serial_async(port_name: &str, bus_param: &BusParam) -> Result<()> {
+    let builder = tokio_serial::new(port_name, bus_param.baud)
+        .data_bits(match bus_param.data_bits {
+            5 => tokio_serial::DataBits::Five,
+            6 => tokio_serial::DataBits::Six,
+            7 => tokio_serial::DataBits::Seven,
+            _ => tokio_serial::DataBits::Eight,
+        })
+        .parity(match bus_param.parity.as_str() {
+            "odd" => tokio_serial::Parity::Odd,
+            "even" => tokio_serial::Parity::Even,
+            _ => tokio_serial::Parity::None,
+        })
+        .stop_bits(match bus_param.stop_bits {
+            2 => tokio_serial::StopBits::Two,
+            _ => tokio_serial::StopBits::One,
+        })
+        .timeout(Duration::from_millis(500));
+    let _port = builder
+        .open_native_async()
+        .with_context(|| format!("Probe serial port {port_name}"))?;
+    // 端口打开成功，立即 drop 关闭
+    Ok(())
 }
 
 // ─── Trait ────────────────────────────────────────────

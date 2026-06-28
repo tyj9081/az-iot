@@ -1,4 +1,4 @@
-use collector_driver::{probe_serial, DriverFactory};
+use collector_driver::{probe_serial_async, DriverFactory};
 use collector_model::{BusType, Device, LatestReading};
 use collector_reporter::{Aggregator, AlarmEngine};
 use collector_uploader::Uploader;
@@ -120,7 +120,7 @@ impl Collector {
                     continue;
                 }
                 if let BusType::Serial { port_name, bus_param } = &device.bus {
-                    match probe_serial(port_name, bus_param) {
+                    match probe_serial_async(port_name, bus_param).await {
                         Ok(()) => {
                             tracing::info!(
                                 "Port probe OK  device={} port={} protocol={}",
