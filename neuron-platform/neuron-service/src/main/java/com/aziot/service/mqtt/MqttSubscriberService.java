@@ -264,11 +264,11 @@ public class MqttSubscriberService {
                 }
             }
 
-            // 实时通道(neuron/+/latest): 写入内存缓存，不落库
+            // 实时通道(neuron/+/latest): 写入内存缓存 + 落库
             if (topic.endsWith("/latest")) {
                 handleLatestReading(deviceId, sensorCode, value, data, timestamp);
                 markDeviceOnline(deviceId);
-                return;
+                // 不 return，继续走下面的 MySQL 落库逻辑
             }
 
             // 聚合通道(neuron/+/reading): 仍写入 MySQL

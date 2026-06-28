@@ -38,6 +38,8 @@ public class SecurityConfig {
                 // 公开只读接口: 前端下拉框等无需登录的场景
                 .requestMatchers(HttpMethod.GET, "/api/v1/protocols").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/manufacturers").permitAll()
+                // WebSocket 握手走 HTTP 升级（SockJS 兼容），需绕过 JWT 过滤
+                .requestMatchers("/ws/**").permitAll()
                 .anyRequest().authenticated()
             )
             // 未认证时返回 401 而非 403，前端据此跳转登录页
