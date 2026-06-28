@@ -6,5 +6,6 @@ export const deviceApi = {
   create: (data: any) => request.post('/devices', data),
   update: (id: number, data: any) => request.put('/devices/' + id, data),
   remove: (id: number) => request.delete('/devices/' + id),
-  updateStatus: (id: number, status: string) => request.put('/devices/' + id + '/status', { status })
+  updateStatus: (id: number, status: string) => request.put('/devices/' + id + '/status', { status }),
+  pushConfig: (id: number) => request.post('/devices/' + id + '/push-config')
 }

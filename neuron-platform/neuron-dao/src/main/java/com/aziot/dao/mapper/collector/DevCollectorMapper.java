@@ -24,4 +24,7 @@ public interface DevCollectorMapper extends BaseMapper<DevCollector> {
 
     /** 按MQTT用户名查询 */
     DevCollector selectByMqttUsername(@Param("mqttUsername") String mqttUsername);
+
+    /** 按MQTT客户端ID查询 */
+    DevCollector selectByMqttClientId(@Param("mqttClientId") String mqttClientId);
 }

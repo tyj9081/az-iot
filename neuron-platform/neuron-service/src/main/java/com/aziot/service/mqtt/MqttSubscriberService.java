@@ -3,6 +3,8 @@ package com.aziot.service.mqtt;
 import com.aziot.dao.entity.device.DevDeviceReading;
 import com.aziot.dao.mapper.device.DevDeviceReadingMapper;
 import com.aziot.dao.mapper.device.DevRegisterMapMapper;
+import com.aziot.dao.mapper.collector.DevCollectorMapper;
+import com.aziot.dao.entity.collector.DevCollector;
 import com.aziot.dao.entity.device.DevRegisterMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -64,12 +66,15 @@ public class MqttSubscriberService {
 
     private final DevDeviceReadingMapper readingMapper;
     private final DevRegisterMapMapper registerMapMapper;
+    private final DevCollectorMapper collectorMapper;
     private final ObjectMapper objectMapper;
 
     public MqttSubscriberService(DevDeviceReadingMapper readingMapper,
-                                  DevRegisterMapMapper registerMapMapper) {
+                                  DevRegisterMapMapper registerMapMapper,
+                                  DevCollectorMapper collectorMapper) {
         this.readingMapper = readingMapper;
         this.registerMapMapper = registerMapMapper;
+        this.collectorMapper = collectorMapper;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -165,6 +170,12 @@ public class MqttSubscriberService {
         String payload = new String(message.getPayload(), java.nio.charset.StandardCharsets.UTF_8);
         log.debug("MQTT RECV topic={} payload={}", topic, payload);
 
+        // 处理采集器状态消息
+        if (topic.endsWith("/status")) {
+            handleStatusMessage(topic, payload);
+            return;
+        }
+
         try {
             Map<String, Object> data = objectMapper.readValue(payload, Map.class);
 
@@ -221,6 +232,34 @@ public class MqttSubscriberService {
             readingMapper.insert(reading);
         } catch (Exception e) {
             log.error("MQTT message handle failed topic={}: {}", topic, e.getMessage());
+        }
+    }
+
+    /**
+     * 处理采集器状态消息。
+     * Topic 格式: neuron/{mqttClientId}/status
+     * Payload:   {"status":"online"}
+     */
+    private void handleStatusMessage(String topic, String payload) {
+        try {
+            String[] segments = topic.split("/");
+            if (segments.length < 3) return;
+            String mqttClientId = segments[1];
+
+            Map<String, Object> data = objectMapper.readValue(payload, Map.class);
+            String status = (String) data.getOrDefault("status", "online");
+
+            DevCollector collector = collectorMapper.selectByMqttClientId(mqttClientId);
+            if (collector != null) {
+                collector.setStatus(status);
+                collector.setLastHeartbeat(LocalDateTime.now());
+                collectorMapper.updateById(collector);
+                log.info("Collector {} status updated to {}", mqttClientId, status);
+            } else {
+                log.warn("Unknown collector mqttClientId: {}", mqttClientId);
+            }
+        } catch (Exception e) {
+            log.error("Status message handle failed: {}", e.getMessage());
         }
     }
 

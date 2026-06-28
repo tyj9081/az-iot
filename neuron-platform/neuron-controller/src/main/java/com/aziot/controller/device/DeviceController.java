@@ -7,6 +7,7 @@ import com.aziot.controller.dto.DeviceCreateDTO;
 import com.aziot.controller.dto.DeviceUpdateDTO;
 import com.aziot.dao.entity.device.DevDevice;
 import com.aziot.service.device.DevDeviceService;
+import com.aziot.service.mqtt.ConfigPushService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,7 @@ import java.util.Map;
 public class DeviceController {
 
     private final DevDeviceService deviceService;
+    private final ConfigPushService configPushService;
 
     @GetMapping
     public ApiResponse<PageResult<DevDeviceVO>> list(
@@ -79,5 +81,12 @@ public class DeviceController {
         String status = body.get("status");
         deviceService.updateStatus(id, status);
         return ApiResponse.ok(deviceService.getById(id));
+    }
+
+    /** 手动触发设备配置下发 */
+    @PostMapping("/{id}/push-config")
+    public ApiResponse<Map<String, Object>> pushConfig(@PathVariable Long id) {
+        configPushService.pushDelta(id, "add");
+        return ApiResponse.ok(Map.of("deviceId", id, "action", "add", "status", "pushed"));
     }
 }

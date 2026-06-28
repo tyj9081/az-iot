@@ -125,7 +125,6 @@ dependencies = [
  "collector-storage",
  "collector-telemetry",
  "collector-uploader",
- "rand",
  "rumqttc",
  "serde",
  "serde_json",

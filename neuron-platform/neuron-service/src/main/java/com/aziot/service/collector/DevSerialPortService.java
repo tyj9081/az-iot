@@ -21,6 +21,7 @@ public class DevSerialPortService extends ServiceImpl<DevSerialPortMapper, DevSe
             throw BusinessException.notFound("串口");
         }
         exist.setPortLabel(port.getPortLabel());
+        exist.setPortType(port.getPortType());
         exist.setBusParam(port.getBusParam());
         exist.setIsActive(port.getIsActive());
         updateById(exist);

@@ -28,14 +28,26 @@
             <span class="panel-dot" :class="collectorOnline ? 'online' : 'offline'"></span>
             <strong>{{ collectorInfo?.name ?? '采集器' }}</strong>
             <span class="panel-sub">{{ collectorOnline ? 'MQTT 在线' : '离线' }}</span>
-            <span class="panel-meta" v-if="collectorInfo">客户端: {{ collectorInfo.mqttClientId }} | IP: {{ collectorInfo.ipAddress }} | 采集周期: {{ collectorInfo.collectIntervalSec }}s</span>
+            <span class="panel-meta" v-if="collectorInfo">MQTT: {{ collectorInfo.mqttClientId }} | IP: {{ collectorInfo.ipAddress }} | 采集周期: {{ collectorInfo.collectIntervalSec }}s</span>
           </span>
         </template>
         <div class="collector-config">
           <div class="config-row">
+            <span class="config-label">名称</span>
+            <el-input v-model="editCollectorName" size="small" style="width:160px" />
+            <span class="config-label" style="margin-left:12px">编码</span>
+            <el-input v-model="editCollectorCode" size="small" style="width:130px" />
+            <span class="config-label" style="margin-left:12px">MQTT客户端ID</span>
+            <el-input v-model="editMqttClientId" size="small" style="width:180px" />
+          </div>
+          <div class="config-row" style="margin-top:8px">
             <span class="config-label">采集周期(秒)</span>
-            <el-input-number v-model="editInterval" :min="10" :max="86400" size="small" style="width:160px" />
-            <el-button type="primary" size="small" :loading="savingCollector" @click="saveCollectorConfig">保存</el-button>
+            <el-input-number v-model="editInterval" :min="10" :max="86400" size="small" style="width:140px" />
+            <span class="config-label" style="margin-left:12px">IP地址</span>
+            <el-input v-model="editCollectorIp" size="small" style="width:140px" />
+            <span class="config-label" style="margin-left:12px">描述</span>
+            <el-input v-model="editCollectorDesc" size="small" style="width:160px" placeholder="备注" />
+            <el-button type="primary" size="small" :loading="savingCollector" @click="saveCollectorConfig" style="margin-left:auto">保存</el-button>
           </div>
         </div>
 
@@ -105,6 +117,7 @@
           <el-button link type="warning" size="small" @click="handleDisable(row)">
             {{ row.status === 'disabled' ? '启用' : '禁用' }}
           </el-button>
+          <el-button link type="info" size="small" @click="handlePushConfig(row)">下发配置</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -157,11 +170,27 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="serialEditVisible" title="编辑串口参数" width="420px" :close-on-click-modal="false">
-      <BusParamForm v-model="serialEditBusParam" />
+    <el-dialog v-model="serialEditVisible" title="编辑串口" width="480px" :close-on-click-modal="false">
+      <el-form label-width="80px" label-position="left">
+        <el-form-item label="标签">
+          <el-input v-model="serialEditLabel" placeholder="如：RS485设备口" />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="serialEditType" style="width:100%">
+            <el-option label="设备 (RS485)" value="device" />
+            <el-option label="IO板卡" value="io_board" />
+            <el-option label="短信猫" value="sms_modem" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="serialEditActive" />
+        </el-form-item>
+        <el-divider content-position="left">总线参数</el-divider>
+        <BusParamForm v-model="serialEditBusParam" />
+      </el-form>
       <template #footer>
         <el-button @click="serialEditVisible = false">取消</el-button>
-        <el-button type="primary" @click="serialEditVisible = false">确认</el-button>
+        <el-button type="primary" :loading="savingSerialPort" @click="saveSerialPortEdit">确认</el-button>
       </template>
     </el-dialog>
   </div>
@@ -196,6 +225,11 @@ const collectorInfo = ref<any>(null)
 const collectorOnline = ref(false)
 const activePanels = ref<string[]>(['collector'])
 const editInterval = ref(600)
+const editCollectorName = ref('')
+const editCollectorCode = ref('')
+const editCollectorDesc = ref('')
+const editMqttClientId = ref('')
+const editCollectorIp = ref('')
 const savingCollector = ref(false)
 const serialPortList = ref<any[]>([])
 
@@ -206,6 +240,11 @@ const canCreateDevice = computed(() => !!collectorInfo.value && modelOptions.val
 // 串口编辑
 const serialEditVisible = ref(false)
 const serialEditBusParam = ref('')
+const serialEditLabel = ref('')
+const serialEditType = ref('device')
+const serialEditActive = ref(true)
+const savingSerialPort = ref(false)
+let serialEditPortId = 0
 
 const dialogVisible = ref(false); const isEdit = ref(false); const submitLoading = ref(false)
 const formRef = ref<FormInstance>()
@@ -233,7 +272,7 @@ function statusLabel(status: string): string {
 }
 
 function portTypeLabel(t: string): string {
-  const map: Record<string, string> = { device: '设备', io_board: 'IO板卡', sms_modem: '短信猫' }
+  const map: Record<string, string> = { device: '设备 (RS485)', io_board: 'IO板卡', sms_modem: '短信猫' }
   return map[t] ?? t
 }
 
@@ -250,6 +289,11 @@ async function loadCollectorAndPorts() {
     if (collectors.length > 0) {
       collectorInfo.value = collectors[0]
       collectorOnline.value = collectorInfo.value.status === 'online'
+      editCollectorName.value = collectorInfo.value.name ?? ''
+      editCollectorCode.value = collectorInfo.value.code ?? ''
+      editCollectorDesc.value = collectorInfo.value.description ?? ''
+      editMqttClientId.value = collectorInfo.value.mqttClientId ?? ''
+      editCollectorIp.value = collectorInfo.value.ipAddress ?? ''
       editInterval.value = collectorInfo.value.collectIntervalSec ?? 600
       await loadSerialPorts(collectorInfo.value.id)
     }
@@ -268,21 +312,52 @@ async function saveCollectorConfig() {
   if (!collectorInfo.value) return
   savingCollector.value = true
   try {
-    await collectorApi.update(collectorInfo.value.id, { ...collectorInfo.value, collectIntervalSec: editInterval.value } as any)
+    await collectorApi.update(collectorInfo.value.id, {
+      name: editCollectorName.value,
+      code: editCollectorCode.value,
+      mqttClientId: editMqttClientId.value,
+      ipAddress: editCollectorIp.value,
+      collectIntervalSec: editInterval.value,
+      description: editCollectorDesc.value
+    })
+    collectorInfo.value.name = editCollectorName.value
+    collectorInfo.value.code = editCollectorCode.value
+    collectorInfo.value.mqttClientId = editMqttClientId.value
+    collectorInfo.value.ipAddress = editCollectorIp.value
+    collectorInfo.value.collectIntervalSec = editInterval.value
+    collectorInfo.value.description = editCollectorDesc.value
     ElMessage.success('采集器设置已保存')
-  } finally { savingCollector.value = false }
+  } catch { ElMessage.error('保存失败') }
+  finally { savingCollector.value = false }
 }
 
 // 串口编辑
 function openSerialPortEdit(port: any) {
+  serialEditPortId = port.id
+  serialEditLabel.value = port.portLabel ?? ''
+  serialEditType.value = port.portType ?? 'device'
+  serialEditActive.value = port.isActive === 1 || port.isActive === true
   serialEditBusParam.value = port.busParam ?? '{"baud":9600,"data_bits":8,"stop_bits":1,"parity":"none"}'
   serialEditVisible.value = true
 }
 
-async function fetchCollectorOptions() {
-  try { const res: any = await collectorApi.list({ page: 1, pageSize: 999 }); collectorOptions.value = res.data?.records ?? [] }
-  catch { collectorOptions.value = [] }
+async function saveSerialPortEdit() {
+  if (!collectorInfo.value) return
+  savingSerialPort.value = true
+  try {
+    await collectorApi.updateSerialPort(collectorInfo.value.id, serialEditPortId, {
+      portLabel: serialEditLabel.value,
+      portType: serialEditType.value,
+      isActive: serialEditActive.value ? 1 : 0,
+      busParam: serialEditBusParam.value
+    })
+    ElMessage.success('串口参数已保存')
+    serialEditVisible.value = false
+    await loadSerialPorts(collectorInfo.value.id)
+  } catch { ElMessage.error('保存失败') }
+  finally { savingSerialPort.value = false }
 }
+
 async function fetchModelOptions() {
   try { const res: any = await deviceModelApi.list({ page: 1, pageSize: 999 }); modelOptions.value = res.data?.records ?? [] }
   catch { modelOptions.value = [] }
@@ -302,7 +377,7 @@ async function fetchList() {
 function handleSearch() { page.value = 1; fetchList() }
 async function onDialogCollectorChange(val: number | null) {
   form.serialPortId = null; dialogSerialPortOptions.value = []
-  if (val) { try { const res: any = await collectorApi.getSerialPorts(val); dialogSerialPortOptions.value = res.data ?? [] } catch { dialogSerialPortOptions.value = [] } }
+  if (val) { try { const res: any = await collectorApi.getSerialPorts(val); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] } }
 }
 function onModelChange(val: number | null) {
   form.protocolId = null; displayProtocolName.value = ''
@@ -313,15 +388,17 @@ function onModelChange(val: number | null) {
 }
 async function openDialog(row?: any) {
   isEdit.value = !!row
-  if (collectorInfo.value) {
-    dialogCollectorOptions.value = [collectorInfo.value]
-    form.collectorId = collectorInfo.value.id
-    try { const res = await collectorApi.getSerialPorts(collectorInfo.value.id); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] }
+  // 加载所有采集器（客户端 MQTT 自行注册）
+  try { const res: any = await collectorApi.list({ page: 1, pageSize: 999 }); dialogCollectorOptions.value = res.data?.records ?? [] } catch { dialogCollectorOptions.value = [] }
+  // 新建设备时默认选中第一个采集器
+  if (!row && dialogCollectorOptions.value.length > 0) {
+    form.collectorId = dialogCollectorOptions.value[0].id
+    try { const res = await collectorApi.getSerialPorts(form.collectorId); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] }
   }
   try { const res: any = await deviceModelApi.list({ page: 1, pageSize: 999 }); dialogModelOptions.value = res.data?.records ?? [] } catch { dialogModelOptions.value = [] }
   if (row) {
     form.id = row.id; form.code = row.code; form.name = row.name
-    form.collectorId = row.collectorId ?? (collectorInfo.value?.id ?? null); form.serialPortId = row.serialPortId ?? null
+    form.collectorId = row.collectorId ?? null; form.serialPortId = row.serialPortId ?? null
     form.deviceModelId = row.modelId ?? null; form.protocolId = row.protocolId ?? null
     form.slaveAddr = row.slaveAddr ?? 1; form.collectInterval = row.collectIntervalSec ?? ''
     if (row.protocolId) { displayProtocolName.value = row.protocolName ?? row.protocol_name ?? ''; dialogProtocolOptions.value = [{ id: row.protocolId, name: displayProtocolName.value }] }
@@ -350,10 +427,17 @@ async function handleDelete(row: any) {
   await deviceApi.remove(row.id); ElMessage.success('删除成功'); fetchList()
 }
 async function handleDisable(row: any) {
-  const targetStatus = row.status === 'disabled' ? 'online' : 'disabled'
-  const label = targetStatus === 'online' ? '启用' : '禁用'
+  const targetStatus = row.status === 'disabled' ? (row._prevStatus || 'offline') : 'disabled'
+  const label = targetStatus === 'disabled' ? '禁用' : '启用'
   await ElMessageBox.confirm('确定' + label + '该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+  if (row.status !== 'disabled') row._prevStatus = row.status
   await deviceApi.updateStatus(row.id, targetStatus); ElMessage.success(label + '成功'); fetchList()
+}
+async function handlePushConfig(row: any) {
+  try {
+    await deviceApi.pushConfig(row.id)
+    ElMessage.success('配置下发中，采集端将自动接收')
+  } catch { ElMessage.error('下发失败，请检查 MQTT 连接') }
 }
 onMounted(() => { loadCollectorAndPorts(); fetchModelOptions(); fetchList() })
 </script>

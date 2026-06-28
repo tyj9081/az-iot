@@ -122,6 +122,7 @@ impl Uploader {
         let fallback_cfg = self.fallback_config.clone();
         let reconnect_notify = self.reconnect_notify.clone();
         let fail_count = self.mqtt_fail_count.clone();
+        let topic_prefix = self.mqtt_config.topic_prefix.clone();
 
         tracing::info!("[UPLOADER] Starting MQTT eventloop task");
 
@@ -140,6 +141,14 @@ impl Uploader {
 
                 let mut opts = MqttOptions::new(&client_id, &host, port);
                 opts.set_keep_alive(Duration::from_secs(30));
+                // LWT: 采集器断连时 EMQX 自动发布离线状态
+                let lwt_topic = format!("{}/{}/status", topic_prefix, client_id);
+                opts.set_last_will(rumqttc::LastWill::new(
+                    lwt_topic,
+                    r#"{"status":"offline"}"#,
+                    QoS::AtLeastOnce,
+                    true,
+                ));
                 opts.set_clean_session(true);
                 if !username.is_empty() {
                     opts.set_credentials(&username, &password);
@@ -174,6 +183,14 @@ impl Uploader {
                                     tracing::info!("[UPLOADER] MQTT ConnAck received");
                                     *channel.write().await = Channel::Mqtt;
                                     *fail_count.write().await = 0;
+
+                                    // 上报采集器在线状态
+                                    if let Some(client) = mqtt_client.read().await.as_ref() {
+                                        let status_topic = format!("{}/{}/status", topic_prefix, client_id);
+                                        let status_payload = r#"{"status":"online"}"#;
+                                        let _ = client.publish(&status_topic, QoS::AtLeastOnce, false, status_payload);
+                                        tracing::info!("[UPLOADER] Status published to {}", status_topic);
+                                    }
                                 }
                                 Ok(_) => {}
                                 Err(e) => {

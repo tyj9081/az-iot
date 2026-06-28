@@ -34,7 +34,7 @@
           <span class="step-text">查看工作台 — 监控设备运行状态</span>
         </div>
       </div>
-      <el-button type="primary" @click="$router.push('/manufacturer')">开始配置 →</el-button>
+      <el-button type="primary" @click="router.push('/manufacturer')">开始配置 →</el-button>
     </div>
 
     <!-- 指标卡片 -->
@@ -214,7 +214,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { dashboardApi } from '@/api/dashboard'
+
+const router = useRouter()
 
 const loading = ref(false)
 const overview = ref<any>(null)

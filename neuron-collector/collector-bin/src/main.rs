@@ -10,12 +10,19 @@ use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_ansi(false) // Windows 终端兼容
+        .init();
     tracing::info!("AZ-IOT Collector v1.0.0 starting...");
 
     // 加载配置 (默认值, 生产环境从 config.toml 读取)
     let config = CollectorConfig::load().unwrap_or_default();
     let sync_mqtt = config.mqtt.clone();
+
+    tracing::info!("Config loaded:");
+    tracing::info!("  MQTT broker: {}", config.mqtt.broker);
+    tracing::info!("  MQTT client_id: {}", config.mqtt.client_id);
+    tracing::info!("  Topic prefix: {}", config.mqtt.topic_prefix);
 
     // 初始化双通道 Uploader
     let uploader = Arc::new(
@@ -32,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
 
     // 启动配置同步 (后台任务)
     let sync_collector = collector.clone();
+    let sub_topic = format!("{}/{}/config/delta", sync_mqtt.topic_prefix, sync_mqtt.client_id);
+    tracing::info!("Starting config sync, subscribing to: {}", sub_topic);
     tokio::spawn(async move {
         collector_config_sync::run(sync_collector, sync_mqtt).await;
     });
@@ -54,7 +63,7 @@ impl Default for CollectorConfig {
         Self {
             mqtt: MqttUploadConfig {
                 broker: "tcp://127.0.0.1:1883".into(),
-                client_id: format!("aziot-collector-{}", rand::random::<u16>()),
+                client_id: "aziot-collector-01".into(),
                 username: String::new(),
                 password: String::new(),
                 topic_prefix: "neuron".into(),
@@ -83,7 +92,7 @@ impl CollectorConfig {
             client_id: parsed.get("mqtt")?.get("client_id")?
                 .as_str()
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| format!("aziot-collector-{}", rand::random::<u16>())),
+                .unwrap_or_else(|| "aziot-collector-01".into()),
             username: parsed.get("mqtt")?.get("username")?
                 .as_str()
                 .map(|s| s.to_string())

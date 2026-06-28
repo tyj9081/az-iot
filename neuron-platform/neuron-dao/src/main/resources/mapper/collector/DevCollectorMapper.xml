@@ -30,4 +30,8 @@
         SELECT * FROM dev_collector WHERE mqtt_username = #{mqttUsername}
     </select>
 
+    <select id="selectByMqttClientId" resultType="com.aziot.dao.entity.collector.DevCollector">
+        SELECT * FROM dev_collector WHERE mqtt_client_id = #{mqttClientId}
+    </select>
+
 </mapper>

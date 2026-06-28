@@ -82,8 +82,8 @@
           </el-form-item>
 
           <el-form-item v-if="importTab === 'file'" label="点位文件">
-            <el-upload :auto-upload="false" :limit="1" accept=".json,.csv"
-              :on-change="onFileChange" :on-remove="onFileRemove" drag>
+              <el-upload :auto-upload="false" :limit="1" accept=".json"
+                :on-change="onFileChange" :on-remove="onFileRemove" drag>
               <el-icon style="font-size:28px"><Upload /></el-icon>
               <div style="margin-top:8px;font-size:13px;color:var(--color-gray-500)">拖拽或点击上传 .json / .csv 文件</div>
             </el-upload>

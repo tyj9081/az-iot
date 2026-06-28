@@ -116,7 +116,7 @@ public class MqttPublisherService {
      */
     public void publish(String topic, String payloadJson) {
         if (client == null || !client.isConnected()) {
-            log.warn("MQTT publish skipped (not connected): topic={}", topic);
+            log.warn("MQTT publish SKIPPED — not connected to broker {}: topic={}", brokerUrl, topic);
             connect(); // 尝试重连
             return;
         }
@@ -125,9 +125,9 @@ public class MqttPublisherService {
             msg.setQos(1);
             msg.setRetained(false);
             client.publish(topic, msg);
-            log.debug("MQTT PUBLISH topic={} payload={}", topic, payloadJson);
+            log.debug("MQTT PUBLISH OK topic={} size={}B", topic, payloadJson.length());
         } catch (MqttException e) {
-            log.warn("MQTT publish failed topic={}: {}", topic, e.getMessage());
+            log.warn("MQTT publish FAILED topic={}: {}", topic, e.getMessage());
         }
     }
 }
