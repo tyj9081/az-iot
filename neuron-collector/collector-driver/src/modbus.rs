@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio_modbus::prelude::*;
-use tokio_serial::SerialPortBuilderExt;
+use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, StopBits};
 
-use super::ProtocolDriver;
+use super::{driver_runtime, ProtocolDriver};
 
 /// Shared Modbus collection logic — runs inside tokio runtime context.
 async fn mb_collect_async(
@@ -161,14 +161,30 @@ impl ProtocolDriver for ModbusRTUDriver {
     fn protocol_name(&self) -> &str { "Modbus RTU" }
 
     fn collect(&self, device: &Device) -> Result<HashMap<String, f64>> {
-        let (port_name, baud) = match &device.bus {
-            BusType::Serial { port_name, bus_param } => (port_name.clone(), bus_param.baud),
+        let (port_name, bus_param) = match &device.bus {
+            BusType::Serial { port_name, bus_param } => (port_name.clone(), bus_param.clone()),
             _ => anyhow::bail!("ModbusRTU requires serial bus, got TCP"),
         };
 
-        let handle = tokio::runtime::Handle::current();
-        handle.block_on(async {
-            let builder = tokio_serial::new(&port_name, baud)
+        // 使用驱动层独立 runtime，避免 Handle::current().block_on() 的嵌套 runtime panic
+        let rt = driver_runtime();
+        rt.block_on(async {
+            let mut builder = tokio_serial::new(&port_name, bus_param.baud)
+                .data_bits(match bus_param.data_bits {
+                    5 => DataBits::Five,
+                    6 => DataBits::Six,
+                    7 => DataBits::Seven,
+                    _ => DataBits::Eight,
+                })
+                .parity(match bus_param.parity.as_str() {
+                    "odd" => Parity::Odd,
+                    "even" => Parity::Even,
+                    _ => Parity::None,
+                })
+                .stop_bits(match bus_param.stop_bits {
+                    2 => StopBits::Two,
+                    _ => StopBits::One,
+                })
                 .timeout(Duration::from_secs(3));
             let port = builder.open_native_async()
                 .with_context(|| format!("Open serial port {port_name}"))?;
@@ -196,8 +212,9 @@ impl ProtocolDriver for ModbusTCPDriver {
             _ => anyhow::bail!("ModbusTCP requires TCP bus"),
         };
 
-        let handle = tokio::runtime::Handle::current();
-        handle.block_on(async {
+        // 使用驱动层独立 runtime，避免 Handle::current().block_on() 的嵌套 runtime panic
+        let rt = driver_runtime();
+        rt.block_on(async {
             let mut ctx = tokio_modbus::client::tcp::connect(socket_addr).await
                 .context("ModbusTCP connect")?;
             ctx.set_slave(Slave(device.slave_addr));

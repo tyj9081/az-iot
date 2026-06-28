@@ -1,5 +1,5 @@
-use collector_driver::DriverFactory;
-use collector_model::{Device, LatestReading};
+use collector_driver::{probe_serial, DriverFactory};
+use collector_model::{BusType, Device, LatestReading};
 use collector_reporter::{Aggregator, AlarmEngine};
 use collector_uploader::Uploader;
 use std::collections::{HashMap, HashSet};
@@ -89,6 +89,7 @@ impl Collector {
         );
 
         let mut tick = 0u64;
+        let mut probed_devices: HashSet<i64> = HashSet::new();
         loop {
             let devices: Vec<Device> = {
                 let registry = self.registry.read().await;
@@ -109,6 +110,32 @@ impl Collector {
             tick += 1;
             if devices.is_empty() && tick % 30 == 1 {
                 tracing::info!("Scheduler tick={} devices=0 (idle)", tick);
+            }
+
+            // ── 串口可用性预检 ──────────────────────────
+            // 对新出现或重启后未探过的串口设备，做一次快速端口打开测试。
+            // 通过则静默记录，失败则立刻以 ERROR 级别告警。
+            for device in &devices {
+                if probed_devices.contains(&device.id) {
+                    continue;
+                }
+                if let BusType::Serial { port_name, bus_param } = &device.bus {
+                    match probe_serial(port_name, bus_param) {
+                        Ok(()) => {
+                            tracing::info!(
+                                "Port probe OK  device={} port={} protocol={}",
+                                device.id, port_name, device.protocol.code()
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Port probe FAIL device={} name={} port={} protocol={}: {:#}",
+                                device.id, device.name, port_name, device.protocol.code(), e
+                            );
+                        }
+                    }
+                }
+                probed_devices.insert(device.id);
             }
 
             for device in devices {
@@ -151,23 +178,31 @@ impl Collector {
                         }
                         Ok(values) => PollOutcome::Success(values),
                         Err(err) => {
-                            let error_type = if err.downcast_ref::<std::io::Error>().is_some() {
-                                "io_error"
-                            } else if err.downcast_ref::<serde_json::Error>().is_some() {
-                                "parse_error"  
-                            } else {
-                                "unknown_error"
-                            };
+                            // 遍历 anyhow error chain 查找底层错误类型。
+                            // downcast_ref 只查最外层，会被 .with_context() 遮蔽，
+                            // 所以需要同时用 root_cause() 到达 error chain 底部。
+                            let error_type =
+                                if err.downcast_ref::<std::io::Error>().is_some()
+                                    || err.root_cause().is::<std::io::Error>()
+                                {
+                                    "io_error"
+                                } else if err.downcast_ref::<serde_json::Error>().is_some()
+                                    || err.root_cause().is::<serde_json::Error>()
+                                {
+                                    "parse_error"
+                                } else {
+                                    "unknown_error"
+                                };
                             PollOutcome::Failure { error_type }
                         }
                     },
-                    // spawn_blocking panic
+                    // spawn_blocking panic (driver 内部 bug)
                     Ok(Err(join_err)) => {
                         tracing::warn!(
                             "Collect task panicked for device {}: {}",
                             dev_id, join_err
                         );
-                        PollOutcome::Failure { error_type: "io_error" }
+                        PollOutcome::Failure { error_type: "driver_panic" }
                     }
                     // 超时
                     Err(_elapsed) => {
