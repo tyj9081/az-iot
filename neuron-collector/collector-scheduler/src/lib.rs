@@ -277,6 +277,10 @@ impl Collector {
                                 read_at: chrono::Utc::now().to_rfc3339(),
                             };
                             self.uploader.publish(&reading).await;
+                            tracing::debug!(
+                                "Published device={} sensor={} value={:.3} unit={}",
+                                device.id, point.sensor_code, value, point.unit
+                            );
                         }
                     }
                 }
