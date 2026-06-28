@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio_modbus::prelude::*;
 use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, StopBits};
 
-use super::{driver_runtime, ProtocolDriver};
+use super::{block_on_driver_runtime, ProtocolDriver};
 
 /// Shared Modbus collection logic — runs inside tokio runtime context.
 async fn mb_collect_async(
@@ -166,10 +166,11 @@ impl ProtocolDriver for ModbusRTUDriver {
             _ => anyhow::bail!("ModbusRTU requires serial bus, got TCP"),
         };
 
-        // 使用驱动层独立 runtime，避免 Handle::current().block_on() 的嵌套 runtime panic
-        let rt = driver_runtime();
-        rt.block_on(async {
-            let mut builder = tokio_serial::new(&port_name, bus_param.baud)
+        // spawn+channel 替代 block_on，彻底避免全局 context 检查导致的 panic
+        let slave_addr = device.slave_addr;
+        let device_clone = device.clone();
+        block_on_driver_runtime(async move {
+            let port = tokio_serial::new(&port_name, bus_param.baud)
                 .data_bits(match bus_param.data_bits {
                     5 => DataBits::Five,
                     6 => DataBits::Six,
@@ -185,11 +186,11 @@ impl ProtocolDriver for ModbusRTUDriver {
                     2 => StopBits::Two,
                     _ => StopBits::One,
                 })
-                .timeout(Duration::from_secs(3));
-            let port = builder.open_native_async()
+                .timeout(Duration::from_secs(3))
+                .open_native_async()
                 .with_context(|| format!("Open serial port {port_name}"))?;
-            let mut ctx = tokio_modbus::client::rtu::attach_slave(port, Slave(device.slave_addr));
-            mb_collect_async(&mut ctx, device).await
+            let mut ctx = tokio_modbus::client::rtu::attach_slave(port, Slave(slave_addr));
+            mb_collect_async(&mut ctx, &device_clone).await
         })
     }
 }
@@ -212,13 +213,14 @@ impl ProtocolDriver for ModbusTCPDriver {
             _ => anyhow::bail!("ModbusTCP requires TCP bus"),
         };
 
-        // 使用驱动层独立 runtime，避免 Handle::current().block_on() 的嵌套 runtime panic
-        let rt = driver_runtime();
-        rt.block_on(async {
+        // spawn+channel 替代 block_on，彻底避免全局 context 检查导致的 panic
+        let slave_addr = device.slave_addr;
+        let device_clone = device.clone();
+        block_on_driver_runtime(async move {
             let mut ctx = tokio_modbus::client::tcp::connect(socket_addr).await
                 .context("ModbusTCP connect")?;
-            ctx.set_slave(Slave(device.slave_addr));
-            mb_collect_async(&mut ctx, device).await
+            ctx.set_slave(Slave(slave_addr));
+            mb_collect_async(&mut ctx, &device_clone).await
         })
     }
 }

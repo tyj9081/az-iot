@@ -88,6 +88,34 @@ pub async fn probe_serial_async(port_name: &str, bus_param: &BusParam) -> Result
     Ok(())
 }
 
+/// sync→async 桥接：在驱动层独立 Runtime 上执行异步任务，通过 mpsc channel 返回结果。
+///
+/// **为什么不用 `driver_runtime().block_on()`？**
+///   tokio 的全局线程上下文检查（`CONTEXT` thread-local）会阻止**任何**
+///   Runtime 的 `block_on` 在已有 runtime context 的线程上运行。
+///   `spawn_blocking` 线程被主 Runtime 注册后即带有 context，
+///   导致 `block_on` 必定 panic："Cannot start a runtime from within a runtime"。
+///
+/// **方案**：`spawn()` 把任务推入驱动 Runtime 的调度队列（不检查 context），
+/// 调用方线程通过 channel 阻塞等待结果。零 `block_on`。
+pub(crate) fn block_on_driver_runtime<F, T>(future: F) -> Result<T>
+where
+    F: std::future::Future<Output = Result<T>> + Send + 'static,
+    T: Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    let rt = driver_runtime();
+    rt.spawn(async move {
+        let result = future.await;
+        let _ = tx.send(result);
+    });
+    match rx.recv_timeout(Duration::from_secs(5)) {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(anyhow::anyhow!("Async operation timed out after 5s")),
+    }
+}
+
 // ─── Trait ────────────────────────────────────────────
 
 /// Common interface for all protocol drivers.
