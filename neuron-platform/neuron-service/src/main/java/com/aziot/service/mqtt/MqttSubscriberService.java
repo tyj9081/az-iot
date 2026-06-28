@@ -8,6 +8,7 @@ import com.aziot.dao.mapper.collector.DevCollectorMapper;
 import com.aziot.dao.entity.collector.DevCollector;
 import com.aziot.dao.entity.device.DevDevice;
 import com.aziot.dao.entity.device.DevRegisterMap;
+import com.aziot.service.cache.RealtimeCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +71,7 @@ public class MqttSubscriberService {
     private final DevRegisterMapMapper registerMapMapper;
     private final DevDeviceMapper deviceMapper;
     private final DevCollectorMapper collectorMapper;
+    private final RealtimeCache realtimeCache;
     private final ObjectMapper objectMapper;
 
     /** 设备在线状态缓存(减少 DB 查询): deviceId → 最后在线时间戳 */
@@ -78,11 +80,13 @@ public class MqttSubscriberService {
     public MqttSubscriberService(DevDeviceReadingMapper readingMapper,
                                   DevRegisterMapMapper registerMapMapper,
                                   DevDeviceMapper deviceMapper,
-                                  DevCollectorMapper collectorMapper) {
+                                  DevCollectorMapper collectorMapper,
+                                  RealtimeCache realtimeCache) {
         this.readingMapper = readingMapper;
         this.registerMapMapper = registerMapMapper;
         this.deviceMapper = deviceMapper;
         this.collectorMapper = collectorMapper;
+        this.realtimeCache = realtimeCache;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -204,52 +208,50 @@ public class MqttSubscriberService {
                 log.warn("MQTT message missing value for device {} sensor {}", deviceId, sensorCode);
                 return;
             }
-            BigDecimal value = valueRaw instanceof Number
-                ? BigDecimal.valueOf(((Number) valueRaw).doubleValue())
-                : new BigDecimal(valueRaw.toString());
+            double value = valueRaw instanceof Number
+                ? ((Number) valueRaw).doubleValue()
+                : Double.parseDouble(valueRaw.toString());
 
             // 解析时间
             String readAtStr = (String) data.getOrDefault("read_at", "");
-            LocalDateTime readAt;
+            long timestamp;
             try {
-                readAt = OffsetDateTime.parse(readAtStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDateTime();
+                timestamp = OffsetDateTime.parse(readAtStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .toInstant().toEpochMilli();
             } catch (Exception e) {
                 try {
-                    readAt = LocalDateTime.parse(readAtStr);
+                    timestamp = LocalDateTime.parse(readAtStr)
+                        .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
                 } catch (Exception ignored) {
-                    readAt = LocalDateTime.now();
+                    timestamp = System.currentTimeMillis();
                 }
             }
 
-            // 查找 register_id
+            // 实时通道(neuron/+/latest): 写入内存缓存，不落库
+            if (topic.endsWith("/latest")) {
+                handleLatestReading(deviceId, sensorCode, value, data, timestamp);
+                markDeviceOnline(deviceId);
+                return;
+            }
+
+            // 聚合通道(neuron/+/reading): 仍写入 MySQL
             Long registerId = getRegisterId(sensorCode);
 
-            // 写入 dev_device_reading
             DevDeviceReading reading = new DevDeviceReading();
             reading.setDeviceId(deviceId);
             reading.setRegisterId(registerId != null ? registerId : 0L);
             reading.setSensorCode(sensorCode);
-            reading.setValue(value);
-            reading.setAvg(value);       // 单次上报，avg = value
-            reading.setMax(value);
-            reading.setMin(value);
+            reading.setValue(BigDecimal.valueOf(value));
+            reading.setAvg(BigDecimal.valueOf(value));       // 单次上报，avg = value
+            reading.setMax(BigDecimal.valueOf(value));
+            reading.setMin(BigDecimal.valueOf(value));
             reading.setSampleCount(1);   // 实时通道每次 1 条
-            reading.setQuality("0");       // 正常
-            reading.setReadAt(readAt);
+            reading.setQuality(0);       // 正常
+            reading.setReadAt(LocalDateTime.now());
 
             readingMapper.insert(reading);
 
-            // 设备有数据上报，标记为在线 (缓存 10s 过期, 减少 DB 查询)
-            Long now = System.currentTimeMillis();
-            Long cached = deviceOnlineCache.get(deviceId);
-            if (cached == null || (now - cached) > 10_000) {
-                deviceOnlineCache.put(deviceId, now);
-                DevDevice device = deviceMapper.selectById(deviceId);
-                if (device != null && !"online".equals(device.getStatus())) {
-                    device.setStatus("online");
-                    deviceMapper.updateById(device);
-                }
-            }
+            markDeviceOnline(deviceId);
         } catch (Exception e) {
             log.error("MQTT message handle failed topic={}: {}", topic, e.getMessage());
         }
@@ -280,6 +282,33 @@ public class MqttSubscriberService {
             }
         } catch (Exception e) {
             log.error("Status message handle failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 实时读数处理 — 写入内存缓存，不走 MySQL。
+     * 双通道架构：通道A（实时）→ 内存缓存 → WebSocket 推送前端。
+     */
+    private void handleLatestReading(long deviceId, String sensorCode, double value,
+                                     Map<String, Object> data, long timestamp) {
+        String unit = (String) data.getOrDefault("unit", "");
+        realtimeCache.put(deviceId, sensorCode, value, unit, timestamp);
+        log.debug("RealtimeCache updated: deviceId={} sensorCode={} value={}", deviceId, sensorCode, value);
+    }
+
+    /**
+     * 标记设备在线（缓存 10s 过期，减少 DB 查询）。
+     */
+    private void markDeviceOnline(long deviceId) {
+        Long now = System.currentTimeMillis();
+        Long cached = deviceOnlineCache.get(deviceId);
+        if (cached == null || (now - cached) > 10_000) {
+            deviceOnlineCache.put(deviceId, now);
+            DevDevice device = deviceMapper.selectById(deviceId);
+            if (device != null && !"online".equals(device.getStatus())) {
+                device.setStatus("online");
+                deviceMapper.updateById(device);
+            }
         }
     }
 

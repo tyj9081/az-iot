@@ -156,51 +156,60 @@ public class ConfigPushService {
     // bus 配置
     // ══════════════════════════════════════════
 
+    /**
+     * 构建 bus 配置，按协议总线类型分发。
+     *
+     * 路由依据: DevProtocol.busType (数据库字段，取值 "serial" / "tcp")，
+     * 特殊情况: MQTT 协议虽 bus_type=tcp，但需要 broker 配置和 subscribe_topic。
+     *
+     * Rust 端 BusType 枚举只接受两种变体:
+     *   Serial { port_name, bus_param }   — 对应 bus_type="serial"
+     *   Tcp { host, port }                — 对应 bus_type="tcp"
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildBusConfig(DeviceContext ctx) {
         Map<String, Object> bus = new LinkedHashMap<>();
+        String protocolCode = ctx.protocol.getCode();
+        String busType = nvl(ctx.protocol.getBusType(), "serial");
 
-        switch (ctx.protocol.getCode()) {
-            case "MQTT" -> {
-                // MQTT 设备: 采集端需要知道 broker 地址和订阅 topic
-                Map<String, Object> mqttBus = new LinkedHashMap<>();
-                mqttBus.put("broker_host", nvl(ctx.collector.getMqttBrokerHost(), "127.0.0.1"));
-                mqttBus.put("broker_port", nvl(ctx.collector.getMqttBrokerPort(), 1883));
-                // 从第一个寄存器取 topic 信息(如果有 extra_params)
-                if (!ctx.registers.isEmpty()) {
-                    try {
-                        Map<String, Object> ep = objectMapper.readValue(
-                            nvl(ctx.registers.get(0).getExtraParams(), "{}"), Map.class);
-                        mqttBus.put("subscribe_topic", ep.getOrDefault("topic", "+/data"));
-                    } catch (Exception ignored) {
-                        mqttBus.put("subscribe_topic", "+/data");
-                    }
+        if ("MQTT".equals(protocolCode)) {
+            // MQTT 设备: 采集端需要知道 broker 地址和订阅 topic (Rust MQTT 驱动自行处理连接)
+            Map<String, Object> mqttBus = new LinkedHashMap<>();
+            mqttBus.put("broker_host", nvl(ctx.collector.getMqttBrokerHost(), "127.0.0.1"));
+            mqttBus.put("broker_port", nvl(ctx.collector.getMqttBrokerPort(), 1883));
+            if (!ctx.registers.isEmpty()) {
+                try {
+                    Map<String, Object> ep = objectMapper.readValue(
+                        nvl(ctx.registers.get(0).getExtraParams(), "{}"), Map.class);
+                    mqttBus.put("subscribe_topic", ep.getOrDefault("topic", "+/data"));
+                } catch (Exception ignored) {
+                    mqttBus.put("subscribe_topic", "+/data");
                 }
-                bus.put("mqtt", mqttBus);
             }
-            case "tcp" -> {
-                // 非 MQTT 的 TCP 协议 (Modbus TCP, BACnet, OPC UA 等)
-                Map<String, Object> tcpBus = new LinkedHashMap<>();
-                tcpBus.put("host", nvl(ctx.collector.getIpAddress(), "127.0.0.1"));
-                tcpBus.put("port", 502); // 可由 extra_params 覆盖
-                bus.put("tcp", tcpBus);
-            }
-            default -> {
-                // serial 协议: Modbus RTU, DL/T645 等
-                Map<String, Object> serialBus = new LinkedHashMap<>();
-                if (ctx.port != null) {
-                    serialBus.put("port_name", ctx.port.getPortName());
-                    try {
-                        serialBus.put("bus_param", objectMapper.readTree(ctx.port.getBusParam()));
-                    } catch (Exception e) {
-                        serialBus.put("bus_param", ctx.port.getBusParam());
-                    }
-                } else {
-                    serialBus.put("port_name", "N/A");
-                    serialBus.put("bus_param", objectMapper.createObjectNode());
+            bus.put("mqtt", mqttBus);
+        } else if ("tcp".equals(busType)) {
+            // TCP 网络协议: Modbus TCP, BACnet/IP, OPC UA, IEC 104, DNP3, S7, FINS,
+            //                EtherNet/IP, Mitsubishi MC, SNMP, HTTP JSON
+            // KNOWN_LIMITATION: port 硬编码 502，后续应按协议映射默认端口 (ADDR-later)
+            Map<String, Object> tcpBus = new LinkedHashMap<>();
+            tcpBus.put("host", nvl(ctx.collector.getIpAddress(), "127.0.0.1"));
+            tcpBus.put("port", 502);
+            bus.put("tcp", tcpBus);
+        } else {
+            // serial 协议: Modbus RTU, DL/T645, IEC 101, CAN Bus, PROFIBUS, HostLink
+            Map<String, Object> serialBus = new LinkedHashMap<>();
+            if (ctx.port != null) {
+                serialBus.put("port_name", ctx.port.getPortName());
+                try {
+                    serialBus.put("bus_param", objectMapper.readTree(ctx.port.getBusParam()));
+                } catch (Exception e) {
+                    serialBus.put("bus_param", ctx.port.getBusParam());
                 }
-                bus.put("serial", serialBus);
+            } else {
+                serialBus.put("port_name", "N/A");
+                serialBus.put("bus_param", objectMapper.createObjectNode());
             }
+            bus.put("serial", serialBus);
         }
         return bus;
     }

@@ -1,12 +1,4 @@
 [build]
-target = "x86_64-pc-windows-gnullvm"
-target-dir = "target"
+target-dir = "D:/cargo-target"
 
-[target.x86_64-pc-windows-gnullvm]
-linker = "rust-lld"
 
-# NOTE: This config requires the full GNU toolchain in PATH.
-# The self-contained mingw tools (dlltool, as, gcc) from the Rust
-# toolchain must be available. On this sandbox, the dlltool/as
-# version mismatch prevents compilation. Build on a system with a
-# properly installed mingw-w64 toolchain or MSVC Build Tools.

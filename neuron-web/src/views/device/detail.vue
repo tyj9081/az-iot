@@ -44,10 +44,10 @@
     </div>
 
     <!-- 实时读数卡片网格 -->
-    <div class="content-block" v-if="readings.length > 0">
+    <div class="content-block" v-if="liveReadings.length > 0">
       <h3 class="section-heading">实时采集数据</h3>
       <div class="readings-grid">
-        <div v-for="item in readings" :key="item.sensorCode" class="reading-card">
+        <div v-for="item in liveReadings" :key="item.sensorCode" class="reading-card">
           <!-- 数值类型 → 数值卡片 -->
           <template v-if="isNumeric(item.dataType)">
             <div class="rc-header">
@@ -100,7 +100,7 @@
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && readings.length === 0" class="content-block">
+    <div v-if="!loading && liveReadings.length === 0" class="content-block">
       <div class="empty-state">
         <svg viewBox="0 0 48 48" fill="none" class="empty-icon">
           <rect x="6" y="8" width="36" height="32" rx="3" stroke="currentColor" stroke-width="1.5"/>
@@ -309,13 +309,29 @@ import { readingApi } from '@/api/reading'
 import { deviceApi } from '@/api/device'
 import { alarmConfigApi } from '@/api/alarm-config'
 import { instructionApi } from '@/api/device-instruction'
+import { useRealtime } from '@/composables/useRealtime'
 
 const route = useRoute()
 const deviceId = Number(route.params.id)
+const realtime = useRealtime()
 
 const loading = ref(false)
 const device = ref<any>(null)
 const readings = ref<any[]>([])
+
+// 合并 API 传感器元数据与 WebSocket 实时值
+const liveReadings = computed(() => {
+  const wsSensors = realtime.getDeviceLatestSensors(deviceId)
+  if (wsSensors.length === 0) return readings.value
+  const wsMap = new Map(wsSensors.map(s => [s.sensorCode, s]))
+  return readings.value.map(r => {
+    const ws = wsMap.get(r.sensorCode)
+    if (ws) {
+      return { ...r, value: ws.value, unit: ws.unit || r.unit, timestamp: ws.timestamp }
+    }
+    return r
+  })
+})
 
 const statusText = computed(() => {
   const map: Record<string, string> = { online: '在线', offline: '离线', alarm: '告警', disabled: '已禁用' }
@@ -510,6 +526,7 @@ const deleteInstruction = async (row: any) => {
 
 onMounted(async () => {
   loading.value = true
+  realtime.connect()
   try {
     const [deviceRes, readingsRes]: [any, any] = await Promise.all([
       deviceApi.getById(deviceId), readingApi.latest(deviceId)

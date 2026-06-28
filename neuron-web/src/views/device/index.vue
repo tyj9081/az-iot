@@ -40,7 +40,9 @@
       </el-table-column>
       <el-table-column label="状态" width="90" align="center">
         <template #default="{ row }">
-          <span :class="['inline-status', row.status]">{{ statusLabel(row.status) }}</span>
+          <span :class="['inline-status', realtime.isDeviceOnline(row.id) ? 'online' : row.status]">
+            {{ realtime.isDeviceOnline(row.id) ? '在线' : statusLabel(row.status) }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right" align="center">
@@ -117,8 +119,10 @@ import { collectorApi } from '@/api/collector'
 import { deviceModelApi } from '@/api/device-model'
 import { protocolApi } from '@/api/protocol'
 import NextStepButton from '@/components/NextStepButton.vue'
+import { useRealtime } from '@/composables/useRealtime'
 
 const router = useRouter()
+const realtime = useRealtime()
 const searchKeyword = ref('')
 const filterCollectorId = ref<number | null>(null)
 const filterSerialPortId = ref<number | null>(null)
@@ -209,7 +213,7 @@ async function openDialog(row?: any) {
   try { const res: any = await collectorApi.list({ page: 1, pageSize: 999 }); dialogCollectorOptions.value = res.data?.records ?? [] } catch { dialogCollectorOptions.value = [] }
   if (!row && dialogCollectorOptions.value.length > 0) {
     form.collectorId = dialogCollectorOptions.value[0].id
-    try { const res = await collectorApi.getSerialPorts(form.collectorId); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] }
+    try { const res = await collectorApi.getSerialPorts(form.collectorId!); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] }
   }
   try { const res: any = await deviceModelApi.list({ page: 1, pageSize: 999 }); dialogModelOptions.value = res.data?.records ?? [] } catch { dialogModelOptions.value = [] }
   if (row) {
@@ -256,7 +260,7 @@ async function handlePushConfig(row: any) {
   try { await deviceApi.pushConfig(row.id); ElMessage.success('配置下发中，采集端将自动接收') }
   catch { ElMessage.error('下发失败，请检查 MQTT 连接') }
 }
-onMounted(() => { fetchCollectorOptions(); fetchModelOptions(); fetchList() })
+onMounted(() => { fetchCollectorOptions(); fetchModelOptions(); fetchList(); realtime.connect() })
 </script>
 
 <style scoped>

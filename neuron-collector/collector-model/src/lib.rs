@@ -171,6 +171,16 @@ pub struct Device {
     pub collect_interval_sec: Option<u64>,
     pub data_points: Vec<DataPoint>,
     pub alarm_config: Option<Vec<DeviceAlarmThreshold>>,
+    #[serde(skip)]
+    pub online: bool,
+    #[serde(skip)]
+    pub consecutive_failures: u32,
+    #[serde(skip)]
+    pub last_success_at: Option<i64>,
+    #[serde(skip)]
+    pub last_error_at: Option<i64>,
+    #[serde(skip)]
+    pub last_error_msg: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

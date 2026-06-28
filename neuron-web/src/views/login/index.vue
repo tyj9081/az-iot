@@ -105,8 +105,7 @@ const handleLogin = async () => {
   error.value = ''
   try {
     const res = await authApi.login(form) as any
-    authStore.setToken(res.data.accessToken)
-    localStorage.setItem('refresh_token', res.data.refreshToken)
+    authStore.setToken(res.data.accessToken, res.data.refreshToken)
     router.push('/dashboard')
   } catch (e: any) {
     error.value = e?.response?.data?.message || '登录失败，请检查账号密码'

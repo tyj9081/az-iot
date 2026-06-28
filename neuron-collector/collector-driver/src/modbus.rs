@@ -23,22 +23,69 @@ async fn mb_collect_async(
         let addr = pt.register_address;
         let count = pt.register_count.max(1);
 
+        let read_start = std::time::Instant::now();
+        tracing::debug!("Modbus read start: fc={} addr={} count={}", fc, addr, count);
+
         let raw: Vec<u16> = match fc {
             1 | 2 => {
-                let coils = ctx.read_coils(addr, count).await
-                    .with_context(|| format!("Read coils at {addr}"))?
-                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default();
-                coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
+                let result = ctx.read_coils(addr, count).await
+                    .with_context(|| format!("Read coils at {addr}"))?;
+                match result {
+                    Ok(coils) => {
+                        tracing::debug!(
+                            "Modbus coils read OK: addr={} count={} elapsed={}ms",
+                            addr, count, read_start.elapsed().as_millis()
+                        );
+                        coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
+                    }
+                    Err(exception) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                            fc, addr, count, exception
+                        );
+                        Vec::new()
+                    }
+                }
             }
             3 | 4 => {
-                ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"))?
-                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default()
+                let result = ctx.read_holding_registers(addr, count).await
+                    .with_context(|| format!("Read registers at {addr}"))?;
+                match result {
+                    Ok(data) => {
+                        tracing::debug!(
+                            "Modbus registers read OK: addr={} count={} elapsed={}ms",
+                            addr, count, read_start.elapsed().as_millis()
+                        );
+                        data
+                    }
+                    Err(exception) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                            fc, addr, count, exception
+                        );
+                        Vec::new()
+                    }
+                }
             }
             _ => {
-                ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"))?
-                    .with_context(|| format!("Modbus exception at {addr}")).unwrap_or_default()
+                let result = ctx.read_holding_registers(addr, count).await
+                    .with_context(|| format!("Read registers at {addr}"))?;
+                match result {
+                    Ok(data) => {
+                        tracing::debug!(
+                            "Modbus registers read OK (default fc): addr={} count={} elapsed={}ms",
+                            addr, count, read_start.elapsed().as_millis()
+                        );
+                        data
+                    }
+                    Err(exception) => {
+                        tracing::warn!(
+                            "Modbus exception fc=0x{:02X} addr={} count={}: {:?}",
+                            fc, addr, count, exception
+                        );
+                        Vec::new()
+                    }
+                }
             }
         };
 

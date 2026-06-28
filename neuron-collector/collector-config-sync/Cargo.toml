@@ -7,6 +7,7 @@ edition = "2021"
 collector-model = { path = "../collector-model" }
 collector-scheduler = { path = "../collector-scheduler" }
 collector-uploader = { path = "../collector-uploader" }
+collector-storage = { path = "../collector-storage" }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

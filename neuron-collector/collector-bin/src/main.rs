@@ -11,11 +11,13 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_ansi(false) // Windows 终端兼容
+        .with_env_filter(EnvFilter::from_default_env())  // 支持 RUST_LOG 环境变量
         .init();
     tracing::info!("AZ-IOT Collector v1.0.0 starting...");
 
@@ -42,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
     // 设备注册表 — 优先从本地文件恢复
     let mut registry = DeviceRegistry::new();
     let persisted = LocalStorage::load_devices_static();
+    let persisted_len = persisted.len();
     if !persisted.is_empty() {
         for device in persisted {
             registry.register(device);
@@ -50,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
     let registry = Arc::new(RwLock::new(registry));
 
     // ─── 遥测心跳 ──────────────────────────────────────
-    let device_count = Arc::new(RwLock::new(persisted.len() as u64));
+    let device_count = Arc::new(RwLock::new(persisted_len as u64));
     {
         let uploader = uploader.clone();
         let publisher: Arc<dyn Fn(String, String) + Send + Sync> = Arc::new(
@@ -62,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
             },
         );
         let telemetry = Telemetry::new(
-            config.mqtt.client_id.clone(),
+            sync_mqtt.client_id.clone(),
             publisher,
             device_count.clone(),
         );

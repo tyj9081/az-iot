@@ -195,7 +195,7 @@ impl LocalStorage {
             }
             if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
                 if let Some(created) = entry.get("created_at").and_then(|v| v.as_str()) {
-                    if created < &threshold_str {
+                    if *created < *threshold_str {
                         removed += 1;
                         continue;
                     }
@@ -246,16 +246,16 @@ impl LocalStorage {
         match fs::read_to_string(path) {
             Ok(json) => match serde_json::from_str::<Vec<Device>>(&json) {
                 Ok(devices) => {
-                    tracing::info!("Loaded {} devices from {}", devices.len(), REGISTRY_PATH);
+                    tracing::info!("Loaded {} devices from {}", devices.len(), Self::REGISTRY_PATH);
                     devices
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to parse {}: {}", REGISTRY_PATH, e);
+                    tracing::warn!("Failed to parse {}: {}", Self::REGISTRY_PATH, e);
                     vec![]
                 }
             },
             Err(e) => {
-                tracing::warn!("Failed to read {}: {}", REGISTRY_PATH, e);
+                tracing::warn!("Failed to read {}: {}", Self::REGISTRY_PATH, e);
                 vec![]
             }
         }

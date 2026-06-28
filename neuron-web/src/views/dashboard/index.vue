@@ -6,13 +6,13 @@
         <h1 class="page-title">工作台</h1>
         <p class="page-subtitle">实时监控园区设备状态与采集数据</p>
       </div>
-      <div class="refresh-info" v-if="overview">
+      <div class="refresh-info" v-if="realtime.connected.value">
         <span class="refresh-dot"></span>
         实时监控中
       </div>
     </div>
 
-    <div class="onboarding-card" v-if="overview && overview.totalDevices === 0">
+    <div class="onboarding-card" v-if="totalDeviceCount === 0">
       <div class="onboarding-icon">🚀</div>
       <h2>欢迎使用 AZ-IOT 能源管理平台</h2>
       <p>开始使用只需 4 步，按顺序完成设备接入配置</p>
@@ -50,7 +50,7 @@
         </div>
         <div class="metric-body">
           <span class="metric-label">设备总数</span>
-          <span class="metric-value">{{ overview?.totalDevices ?? 0 }}</span>
+          <span class="metric-value">{{ totalDeviceCount }}</span>
         </div>
       </div>
 
@@ -64,14 +64,14 @@
         <div class="metric-body">
           <span class="metric-label">
             在线设备
-            <span class="online-rate" v-if="overview?.totalDevices">
-              {{ percent(overview.onlineDevices, overview.totalDevices) }}%
+            <span class="online-rate" v-if="totalDeviceCount">
+              {{ percent(onlineDeviceCount, totalDeviceCount) }}%
             </span>
           </span>
-          <span class="metric-value online">{{ overview?.onlineDevices ?? 0 }}</span>
+          <span class="metric-value online">{{ onlineDeviceCount }}</span>
         </div>
         <div class="metric-bar">
-          <div class="metric-bar-fill online-fill" :style="{ width: barWidth(overview?.onlineDevices, overview?.totalDevices) }"></div>
+          <div class="metric-bar-fill online-fill" :style="{ width: barWidth(onlineDeviceCount, totalDeviceCount) }"></div>
         </div>
       </div>
 
@@ -129,7 +129,7 @@
                 class="ring-arc"/>
             </svg>
             <div class="ring-center">
-              <span class="ring-total">{{ overview.totalDevices ?? 0 }}</span>
+              <span class="ring-total">{{ totalDeviceCount }}</span>
               <span class="ring-label">总计</span>
             </div>
           </div>
@@ -137,17 +137,17 @@
             <div class="legend-item">
               <span class="legend-dot online-dot"></span>
               <span class="legend-label">在线</span>
-              <span class="legend-value">{{ overview.onlineDevices ?? 0 }}</span>
+              <span class="legend-value">{{ onlineDeviceCount }}</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot offline-dot"></span>
               <span class="legend-label">离线</span>
-              <span class="legend-value">{{ (overview.totalDevices ?? 0) - (overview.onlineDevices ?? 0) - (overview.alarms ?? 0) }}</span>
+              <span class="legend-value">{{ totalDeviceCount - onlineDeviceCount - (overview?.alarms ?? 0) }}</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot alarm-dot"></span>
               <span class="legend-label">告警</span>
-              <span class="legend-value">{{ overview.alarms ?? 0 }}</span>
+              <span class="legend-value">{{ overview?.alarms ?? 0 }}</span>
             </div>
           </div>
         </div>
@@ -216,6 +216,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { dashboardApi } from '@/api/dashboard'
+import { deviceApi } from '@/api/device'
+import { useRealtime } from '@/composables/useRealtime'
 
 const router = useRouter()
 
@@ -223,6 +225,23 @@ const loading = ref(false)
 const overview = ref<any>(null)
 const recentReadings = ref<any[]>([])
 const hourlyBars = ref<any[]>([])
+const allDevices = ref<any[]>([])
+
+const realtime = useRealtime()
+
+/** WebSocket 实时在线数 */
+const wsOnlineCount = computed(() => realtime.getOnlineDeviceCount())
+
+/** 总设备数：优先用列表总数，回退到 overview */
+const totalDeviceCount = computed(() => allDevices.value.length || overview.value?.totalDevices || 0)
+
+/** 在线设备数：WebSocket 连上则用实时数据，否则用 API 数据 */
+const onlineDeviceCount = computed(() => {
+  if (realtime.connected.value && wsOnlineCount.value > 0) {
+    return wsOnlineCount.value
+  }
+  return overview.value?.onlineDevices ?? 0
+})
 
 function formatValue(v: number): string {
   if (v == null) return '-'
@@ -257,12 +276,12 @@ function barWidth(part: number, total: number): string {
 
 // Ring chart calculations
 const onlinePct = computed(() => {
-  if (!overview.value?.totalDevices) return 0
-  return ((overview.value.onlineDevices ?? 0) / overview.value.totalDevices) * 100
+  if (!totalDeviceCount.value) return 0
+  return (onlineDeviceCount.value / totalDeviceCount.value) * 100
 })
 const alarmPct = computed(() => {
-  if (!overview.value?.totalDevices) return 0
-  return ((overview.value.alarms ?? 0) / overview.value.totalDevices) * 100
+  if (!totalDeviceCount.value) return 0
+  return ((overview.value?.alarms ?? 0) / totalDeviceCount.value) * 100
 })
 const offlinePct = computed(() => {
   return Math.max(0, 100 - onlinePct.value - alarmPct.value)
@@ -305,17 +324,23 @@ function generateHourlyBars(readings: any[]) {
 onMounted(async () => {
   loading.value = true
   try {
-    const res: any = await dashboardApi.overview()
-    overview.value = res.data ?? {}
-    recentReadings.value = res.data?.recentReadings ?? []
+    const [overviewRes, deviceRes]: [any, any] = await Promise.all([
+      dashboardApi.overview(),
+      deviceApi.list({ page: 1, pageSize: 9999 })
+    ])
+    overview.value = overviewRes.data ?? {}
+    allDevices.value = deviceRes?.data?.records ?? []
+    recentReadings.value = overviewRes.data?.recentReadings ?? []
     hourlyBars.value = generateHourlyBars(recentReadings.value)
   } catch {
     overview.value = null
     recentReadings.value = []
     hourlyBars.value = []
+    allDevices.value = []
   } finally {
     loading.value = false
   }
+  realtime.connect()
 })
 </script>
 

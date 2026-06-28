@@ -33,7 +33,7 @@ public class DevDeviceReading {
 
     private Integer sampleCount;
 
-    private String quality;
+    private Integer quality;
 
     private LocalDateTime readAt;
 

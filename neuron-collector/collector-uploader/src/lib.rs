@@ -201,10 +201,10 @@ impl Uploader {
 
                                     tracing::warn!(
                                         "[UPLOADER] MQTT eventloop error (fail {}/{}): {}",
-                                        current_cnt, MAX_MQTT_RETRIES, e
+                                        current_cnt, Self::MAX_MQTT_RETRIES, e
                                     );
 
-                                    if current_cnt >= MAX_MQTT_RETRIES {
+                                    if current_cnt >= Self::MAX_MQTT_RETRIES {
                                         // 切换到 fallback
                                         *channel.write().await = Channel::HttpFallback;
                                         tracing::warn!(
@@ -415,6 +415,11 @@ impl Uploader {
         } else {
             tracing::debug!("[UPLOADER] publish_raw skipped: no MQTT client");
         }
+    }
+
+    /// 获取 MQTT client_id，供上报模块构造 topic
+    pub fn client_id(&self) -> &str {
+        &self.mqtt_config.client_id
     }
 
     /// 当前活跃通道

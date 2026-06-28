@@ -1,8 +1,10 @@
 use collector_driver::DriverFactory;
 use collector_model::{Device, LatestReading};
+use collector_reporter::{Aggregator, AlarmEngine};
 use collector_uploader::Uploader;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 
 pub struct DeviceRegistry {
@@ -63,11 +65,20 @@ pub type SharedRegistry = Arc<RwLock<DeviceRegistry>>;
 pub struct Collector {
     pub registry: SharedRegistry,
     pub uploader: Arc<Uploader>,
+    /// 每个设备一个聚合器 (device_id → Aggregator)
+    aggregators: Arc<tokio::sync::Mutex<HashMap<i64, Aggregator>>>,
+    /// 每个设备一个告警引擎 (device_id → AlarmEngine)
+    alarm_engines: Arc<tokio::sync::Mutex<HashMap<i64, AlarmEngine>>>,
 }
 
 impl Collector {
     pub fn new(registry: SharedRegistry, uploader: Arc<Uploader>) -> Self {
-        Self { registry, uploader }
+        Self {
+            registry,
+            uploader,
+            aggregators: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            alarm_engines: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+        }
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
@@ -92,8 +103,8 @@ impl Collector {
 
             for device in devices {
                 let dev_id = device.id;
-                let dev_proto = device.protocol.display_name().to_string();
-                tracing::info!("Collecting device {} protocol={}", dev_id, dev_proto);
+                let proto = device.protocol.code().to_string();
+                let start = Instant::now();
 
                 let driver = match DriverFactory::create(&device) {
                     Some(d) => d,
@@ -107,44 +118,207 @@ impl Collector {
                     }
                 };
 
-                // 使用 spawn_blocking 卸到独立线程池, 避免阻塞 tokio worker
+                // 带超时保护的 spawn_blocking
                 let device_clone = device.clone();
-                let result = match tokio::task::spawn_blocking(move || {
-                    driver.collect(&device_clone)
-                }).await {
-                    Ok(r) => r,
-                    Err(join_err) => {
+                let timeout_result = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    tokio::task::spawn_blocking(move || driver.collect(&device_clone)),
+                ).await;
+
+                let elapsed_ms = start.elapsed().as_millis() as u64;
+
+                // ── 解析嵌套结果 ────────────────────────────
+                enum PollOutcome {
+                    Success(HashMap<String, f64>),
+                    Failure { error_type: &'static str },
+                }
+
+                let outcome = match timeout_result {
+                    // 正常完成
+                    Ok(Ok(collect_r)) => match collect_r {
+                        Ok(values) if values.is_empty() => {
+                            PollOutcome::Failure { error_type: "empty_result" }
+                        }
+                        Ok(values) => PollOutcome::Success(values),
+                        Err(err) => {
+                            let error_type = if err.downcast_ref::<std::io::Error>().is_some() {
+                                "io_error"
+                            } else {
+                                "io_error"
+                            };
+                            PollOutcome::Failure { error_type }
+                        }
+                    },
+                    // spawn_blocking panic
+                    Ok(Err(join_err)) => {
                         tracing::warn!(
                             "Collect task panicked for device {}: {}",
-                            device_clone.id, join_err
+                            dev_id, join_err
                         );
-                        continue;
+                        PollOutcome::Failure { error_type: "io_error" }
+                    }
+                    // 超时
+                    Err(_elapsed) => {
+                        PollOutcome::Failure { error_type: "timeout" }
                     }
                 };
 
-                match result {
-                    Ok(values) => {
+                // ── 设备状态更新 + 状态上报 ─────────────────
+                let mut status_payload: Option<String> = None;
+
+                match &outcome {
+                    PollOutcome::Success(values) => {
                         let count = values.len();
-                        if count > 0 {
-                            tracing::info!("Device {} collected {} data points", device.id, count);
-                        } else {
-                            tracing::warn!("Device {} collect returned 0 data points", device.id);
-                        }
-                        for point in &device.data_points {
-                            if let Some(value) = values.get(&point.sensor_code) {
-                                let reading = LatestReading {
-                                    device_id: device.id,
-                                    sensor_code: point.sensor_code.clone(),
-                                    value: *value,
-                                    unit: point.unit.clone(),
-                                    read_at: chrono::Utc::now().to_rfc3339(),
-                                };
-                                self.uploader.publish(&reading).await;
+                        tracing::info!(
+                            "Device {} OK {}pts protocol={} elapsed={}ms",
+                            dev_id, count, proto, elapsed_ms
+                        );
+
+                        // 更新 registry
+                        {
+                            let mut registry = self.registry.write().await;
+                            if let Some(dev) = registry.devices.get_mut(&dev_id) {
+                                dev.consecutive_failures = 0;
+                                dev.last_success_at = Some(chrono::Utc::now().timestamp());
+                                dev.last_error_msg.clear();
+                                if !dev.online {
+                                    dev.online = true;
+                                    let payload = serde_json::json!({
+                                        "device_id": dev_id,
+                                        "status": "online",
+                                        "timestamp": chrono::Utc::now().to_rfc3339(),
+                                    }).to_string();
+                                    status_payload = Some(payload);
+                                }
                             }
                         }
                     }
-                    Err(err) => {
-                        tracing::warn!("Collect failed for device {}: {}", device.id, err);
+                    PollOutcome::Failure { error_type } => {
+                        let mut consecutive = 0u32;
+                        {
+                            let mut registry = self.registry.write().await;
+                            if let Some(dev) = registry.devices.get_mut(&dev_id) {
+                                dev.consecutive_failures += 1;
+                                dev.last_error_at = Some(chrono::Utc::now().timestamp());
+                                consecutive = dev.consecutive_failures;
+                                if dev.consecutive_failures >= 3 && dev.online {
+                                    dev.online = false;
+                                    let payload = serde_json::json!({
+                                        "device_id": dev_id,
+                                        "status": "offline",
+                                        "timestamp": chrono::Utc::now().to_rfc3339(),
+                                    }).to_string();
+                                    status_payload = Some(payload);
+                                }
+                            }
+                        }
+                        tracing::warn!(
+                            "Device {} FAIL protocol={} error_type={} elapsed={}ms consecutive={}",
+                            dev_id, proto, error_type, elapsed_ms, consecutive
+                        );
+                    }
+                }
+
+                // 发布设备状态变更
+                if let Some(payload) = status_payload {
+                    let client_id = self.uploader.client_id().to_string();
+                    let topic = format!("{}/{}/status", "neuron", client_id);
+                    self.uploader.publish_raw(&topic, &payload).await;
+                    tracing::info!("Device {} status published to {}", dev_id, topic);
+                }
+
+                // 失败时跳过后续数据处理
+                let values = match outcome {
+                    PollOutcome::Success(v) => v,
+                    PollOutcome::Failure { .. } => continue,
+                };
+
+                // ── Channel A: 实时上报 ──────────────────
+                {
+                    for point in &device.data_points {
+                        if let Some(value) = values.get(&point.sensor_code) {
+                            let reading = LatestReading {
+                                device_id: device.id,
+                                sensor_code: point.sensor_code.clone(),
+                                value: *value,
+                                unit: point.unit.clone(),
+                                read_at: chrono::Utc::now().to_rfc3339(),
+                            };
+                            self.uploader.publish(&reading).await;
+                        }
+                    }
+                }
+
+                // ── Channel B: 聚合上报 ──────────────────
+                {
+                    let mut aggs = self.aggregators.lock().await;
+                    let aggregator = aggs
+                        .entry(device.id)
+                        .or_insert_with(|| Aggregator::new(device.id, 60));
+                    let now_ts = chrono::Utc::now().timestamp();
+                    for point in &device.data_points {
+                        if let Some(value) = values.get(&point.sensor_code) {
+                            aggregator.push(device.id, &point.sensor_code, *value, now_ts);
+                        }
+                    }
+                    if aggregator.is_ready() {
+                        let readings = aggregator.flush();
+                        aggregator.reset();
+                        drop(aggs);
+
+                        let client_id = self.uploader.client_id();
+                        for agg in readings {
+                            let topic = format!(
+                                "{}/{}/reading",
+                                "neuron", client_id
+                            );
+                            match serde_json::to_string(&agg) {
+                                Ok(payload) => {
+                                    self.uploader.publish_raw(&topic, &payload).await;
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Serialize AggregatedReading error: {}", e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── 告警检测 ────────────────────────────
+                {
+                    let mut engines = self.alarm_engines.lock().await;
+                    let alarm_engine = engines
+                        .entry(device.id)
+                        .or_insert_with(|| AlarmEngine::new(&device.alarm_config));
+
+                    for point in &device.data_points {
+                        if let Some(value) = values.get(&point.sensor_code) {
+                            if let Some(event) = alarm_engine.check(&device, &point.sensor_code, *value) {
+                                let client_id = self.uploader.client_id();
+                                let topic = format!(
+                                    "{}/{}/alarm",
+                                    "neuron", client_id
+                                );
+                                match serde_json::to_string(&event) {
+                                    Ok(payload) => {
+                                        self.uploader.publish_raw(&topic, &payload).await;
+                                        tracing::warn!(
+                                            "Alarm triggered: device={} sensor={} level={}",
+                                            event.device_id,
+                                            event.sensor_code,
+                                            event.level
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::error!(
+                                            "Serialize AlarmEvent error: {}", e
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -180,6 +354,11 @@ mod tests {
             collect_interval_sec: None,
             data_points: vec![],
             alarm_config: None,
+            online: false,
+            consecutive_failures: 0,
+            last_success_at: None,
+            last_error_at: None,
+            last_error_msg: String::new(),
         };
         reg.register(device);
         assert!(reg.get(1).is_some());
