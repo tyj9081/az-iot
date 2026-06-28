@@ -12,6 +12,31 @@
       </div>
     </div>
 
+    <div class="onboarding-card" v-if="overview && overview.totalDevices === 0">
+      <div class="onboarding-icon">🚀</div>
+      <h2>欢迎使用 AZ-IOT 能源管理平台</h2>
+      <p>开始使用只需 4 步，按顺序完成设备接入配置</p>
+      <div class="onboarding-steps">
+        <div class="onboarding-step">
+          <span class="step-num">1</span>
+          <span class="step-text">录入品牌 — 添加设备厂商信息</span>
+        </div>
+        <div class="onboarding-step">
+          <span class="step-num">2</span>
+          <span class="step-text">创建型号 — 定义设备型号并导入点表</span>
+        </div>
+        <div class="onboarding-step">
+          <span class="step-num">3</span>
+          <span class="step-text">注册设备 — 将物理设备接入系统</span>
+        </div>
+        <div class="onboarding-step">
+          <span class="step-num">4</span>
+          <span class="step-text">查看工作台 — 监控设备运行状态</span>
+        </div>
+      </div>
+      <el-button type="primary" @click="$router.push('/manufacturer')">开始配置 →</el-button>
+    </div>
+
     <!-- 指标卡片 -->
     <div class="metrics-row">
       <div class="metric-card metric-card--total">
@@ -724,4 +749,20 @@ onMounted(async () => {
     align-items: center;
   }
 }
+
+.onboarding-card {
+  padding: var(--space-8);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+.onboarding-icon { font-size: 36px; margin-bottom: var(--space-4); }
+.onboarding-card h2 { font-size: var(--text-xl); font-weight: var(--font-weight-semibold); color: var(--color-gray-800); margin: 0 0 var(--space-2); }
+.onboarding-card p { font-size: var(--text-sm); color: var(--color-gray-500); margin: 0 0 var(--space-6); }
+.onboarding-steps { display: flex; flex-direction: column; gap: var(--space-3); max-width: 400px; margin: 0 auto var(--space-6); text-align: left; }
+.onboarding-step { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-gray-50); border-radius: var(--radius-md); }
+.step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-brand-500); color: #fff; font-size: 12px; font-weight: var(--font-weight-semibold); flex-shrink: 0; }
+.step-text { font-size: var(--text-sm); color: var(--color-gray-700); }
 </style>

@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:mysql://8.163.61.99:3306/neuron_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: jeff_remote
-    password: ${DB_PASSWORD:}
+    password: Gzb1qVL74XFmaueq
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 jwt:
@@ -35,4 +35,4 @@ app:
   mqtt:
     broker-url: tcp://8.163.61.99:1883
     username: neuron-server
-    password: ${MQTT_PASSWORD:}
+    password: emqx_neuron_2026

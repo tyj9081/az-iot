@@ -2,7 +2,6 @@ package com.aziot.dao.mapper.device;
 
 import com.aziot.dao.entity.device.DevDevice;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -11,7 +10,7 @@ import org.apache.ibatis.annotations.Param;
 public interface DevDeviceMapper extends BaseMapper<DevDevice> {
 
     /** 分页条件查询设备 */
-    IPage<DevDevice> selectPageByCondition(
+    Page<DevDevice> selectPageByCondition(
         Page<DevDevice> page,
         @Param("serialPortId") Long serialPortId,
         @Param("portIds") java.util.List<Long> portIds,

@@ -19,10 +19,8 @@ public class SysUser {
 
     private String username;
 
-    @TableField("password")
     private String passwordHash;
 
-    @TableField("real_name")
     private String nickname;
 
     private String email;
@@ -31,7 +29,7 @@ public class SysUser {
 
     private String avatarUrl;
 
-    private String status;
+    private Integer status;
 
     @TableLogic
     private Integer isDeleted;

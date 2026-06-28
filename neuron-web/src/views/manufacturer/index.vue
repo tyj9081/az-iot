@@ -33,6 +33,8 @@
       @current-change="fetchList" @size-change="fetchList"
     />
 
+    <NextStepButton to="/device-model" label="创建型号" />
+
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑品牌' : '新增品牌'" width="520px" :close-on-click-modal="false" @closed="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="编码" prop="code"><el-input v-model="form.code" placeholder="请输入编码" /></el-form-item>
@@ -57,6 +59,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { manufacturerApi } from '@/api/manufacturer'
+import NextStepButton from '@/components/NextStepButton.vue'
 
 const searchKeyword = ref(''); const loading = ref(false); const tableData = ref<any[]>([])
 const page = ref(1); const pageSize = ref(10); const total = ref(0)

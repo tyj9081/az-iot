@@ -2,10 +2,7 @@
   <div class="device-page page-container">
     <div class="page-toolbar">
       <div class="filter-group">
-        <el-select v-model="filterCollectorId" placeholder="采集器" clearable style="width: 180px" @change="onFilterCollectorChange">
-          <el-option v-for="c in collectorOptions" :key="c.id" :label="c.name + ' (' + c.code + ')'" :value="c.id" />
-        </el-select>
-        <el-select v-model="filterSerialPortId" placeholder="串口" clearable :disabled="!filterCollectorId" style="width: 160px" @change="handleSearch">
+        <el-select v-model="filterSerialPortId" placeholder="串口" clearable style="width: 160px" @change="handleSearch">
           <el-option v-for="p in filterSerialPortOptions" :key="p.id" :label="p.portName" :value="p.id" />
         </el-select>
         <el-select v-model="filterModelId" placeholder="型号" clearable style="width: 180px" @change="handleSearch">
@@ -21,8 +18,64 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
       </div>
-      <el-button type="primary" @click="openDialog()">新增设备</el-button>
+      <el-button type="primary" :disabled="!canCreateDevice" @click="openDialog()">新增设备</el-button>
     </div>
+
+    <el-collapse v-model="activePanels" class="collector-panel">
+      <el-collapse-item name="collector" :title="collectorPanelTitle">
+        <template #title>
+          <span class="panel-title-row">
+            <span class="panel-dot" :class="collectorOnline ? 'online' : 'offline'"></span>
+            <strong>{{ collectorInfo?.name ?? '采集器' }}</strong>
+            <span class="panel-sub">{{ collectorOnline ? 'MQTT 在线' : '离线' }}</span>
+            <span class="panel-meta" v-if="collectorInfo">客户端: {{ collectorInfo.mqttClientId }} | IP: {{ collectorInfo.ipAddress }} | 采集周期: {{ collectorInfo.collectIntervalSec }}s</span>
+          </span>
+        </template>
+        <div class="collector-config">
+          <div class="config-row">
+            <span class="config-label">采集周期(秒)</span>
+            <el-input-number v-model="editInterval" :min="10" :max="86400" size="small" style="width:160px" />
+            <el-button type="primary" size="small" :loading="savingCollector" @click="saveCollectorConfig">保存</el-button>
+          </div>
+        </div>
+
+        <el-divider content-position="left">串口列表</el-divider>
+        <el-table :data="serialPortList" size="small" stripe>
+          <el-table-column prop="portName" label="串口" width="100" />
+          <el-table-column prop="portLabel" label="标签" width="120">
+            <template #default="{ row }">{{ row.portLabel || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="portType" label="类型" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.portType === 'device' ? '' : 'info'">{{ portTypeLabel(row.portType) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="波特率" width="90">
+            <template #default="{ row }">{{ busParamField(row, 'baud') }}</template>
+          </el-table-column>
+          <el-table-column label="数据位" width="70">
+            <template #default="{ row }">{{ busParamField(row, 'data_bits') }}</template>
+          </el-table-column>
+          <el-table-column label="停止位" width="70">
+            <template #default="{ row }">{{ busParamField(row, 'stop_bits') }}</template>
+          </el-table-column>
+          <el-table-column label="校验" width="70">
+            <template #default="{ row }">{{ busParamField(row, 'parity') }}</template>
+          </el-table-column>
+          <el-table-column label="启用" width="70" align="center">
+            <template #default="{ row }">
+              <span :class="['inline-status', row.isActive ? 'online' : 'offline']">{{ row.isActive ? '启用' : '停用' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" :disabled="row.portType !== 'device'" @click="openSerialPortEdit(row)">编辑</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div style="margin-top:8px;font-size:12px;color:var(--color-gray-400)">波特率修改后通过 MQTT 实时下发到采集端生效</div>
+      </el-collapse-item>
+    </el-collapse>
 
     <el-table v-loading="loading" :data="tableData" stripe>
       <el-table-column prop="code" label="编码" min-width="120" />
@@ -61,6 +114,8 @@
       :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next, jumper"
       @current-change="fetchList" @size-change="fetchList"
     />
+
+    <NextStepButton to="/dashboard" label="查看工作台" />
 
     <el-dialog
       v-model="dialogVisible" :title="isEdit ? '编辑设备' : '新增设备'"
@@ -101,11 +156,19 @@
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="serialEditVisible" title="编辑串口参数" width="420px" :close-on-click-modal="false">
+      <BusParamForm v-model="serialEditBusParam" />
+      <template #footer>
+        <el-button @click="serialEditVisible = false">取消</el-button>
+        <el-button type="primary" @click="serialEditVisible = false">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -114,17 +177,36 @@ import { deviceApi } from '@/api/device'
 import { collectorApi } from '@/api/collector'
 import { deviceModelApi } from '@/api/device-model'
 import { protocolApi } from '@/api/protocol'
+import BusParamForm from '@/components/BusParamForm.vue'
+import NextStepButton from '@/components/NextStepButton.vue'
 
 const router = useRouter()
 const searchKeyword = ref('')
-const filterCollectorId = ref<number | null>(null)
 const filterSerialPortId = ref<number | null>(null)
 const filterModelId = ref<number | null>(null)
 const filterStatus = ref('')
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const page = ref(1); const pageSize = ref(10); const total = ref(0)
-const collectorOptions = ref<any[]>([]); const filterSerialPortOptions = ref<any[]>([]); const modelOptions = ref<any[]>([])
+const modelOptions = ref<any[]>([])
+const filterSerialPortOptions = ref<any[]>([])
+
+// 采集器（单例）
+const collectorInfo = ref<any>(null)
+const collectorOnline = ref(false)
+const activePanels = ref<string[]>(['collector'])
+const editInterval = ref(600)
+const savingCollector = ref(false)
+const serialPortList = ref<any[]>([])
+
+const collectorPanelTitle = computed(() => `${collectorInfo.value?.name ?? '采集器'} · ${collectorOnline.value ? 'MQTT 在线' : '离线'}`)
+
+const canCreateDevice = computed(() => !!collectorInfo.value && modelOptions.value.length > 0)
+
+// 串口编辑
+const serialEditVisible = ref(false)
+const serialEditBusParam = ref('')
+
 const dialogVisible = ref(false); const isEdit = ref(false); const submitLoading = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
@@ -150,6 +232,53 @@ function statusLabel(status: string): string {
   return map[status] ?? status
 }
 
+function portTypeLabel(t: string): string {
+  const map: Record<string, string> = { device: '设备', io_board: 'IO板卡', sms_modem: '短信猫' }
+  return map[t] ?? t
+}
+
+function busParamField(row: any, key: string): string {
+  try { const p = typeof row.busParam === 'string' ? JSON.parse(row.busParam) : row.busParam; return String(p?.[key] ?? '-') }
+  catch { return '-' }
+}
+
+// 采集器 & 串口加载
+async function loadCollectorAndPorts() {
+  try {
+    const res = await collectorApi.list({ page: 1, pageSize: 1 })
+    const collectors = res.data?.records ?? []
+    if (collectors.length > 0) {
+      collectorInfo.value = collectors[0]
+      collectorOnline.value = collectorInfo.value.status === 'online'
+      editInterval.value = collectorInfo.value.collectIntervalSec ?? 600
+      await loadSerialPorts(collectorInfo.value.id)
+    }
+  } catch { collectorInfo.value = null }
+}
+
+async function loadSerialPorts(collectorId: number) {
+  try {
+    const res = await collectorApi.getSerialPorts(collectorId)
+    serialPortList.value = res.data ?? []
+    filterSerialPortOptions.value = serialPortList.value.filter((p: any) => p.portType === 'device')
+  } catch { serialPortList.value = []; filterSerialPortOptions.value = [] }
+}
+
+async function saveCollectorConfig() {
+  if (!collectorInfo.value) return
+  savingCollector.value = true
+  try {
+    await collectorApi.update(collectorInfo.value.id, { ...collectorInfo.value, collectIntervalSec: editInterval.value } as any)
+    ElMessage.success('采集器设置已保存')
+  } finally { savingCollector.value = false }
+}
+
+// 串口编辑
+function openSerialPortEdit(port: any) {
+  serialEditBusParam.value = port.busParam ?? '{"baud":9600,"data_bits":8,"stop_bits":1,"parity":"none"}'
+  serialEditVisible.value = true
+}
+
 async function fetchCollectorOptions() {
   try { const res: any = await collectorApi.list({ page: 1, pageSize: 999 }); collectorOptions.value = res.data?.records ?? [] }
   catch { collectorOptions.value = [] }
@@ -158,16 +287,13 @@ async function fetchModelOptions() {
   try { const res: any = await deviceModelApi.list({ page: 1, pageSize: 999 }); modelOptions.value = res.data?.records ?? [] }
   catch { modelOptions.value = [] }
 }
-async function onFilterCollectorChange(val: number | null) {
-  filterSerialPortId.value = null; filterSerialPortOptions.value = []
-  if (val) { try { const res: any = await collectorApi.getSerialPorts(val); filterSerialPortOptions.value = res.data ?? [] } catch { filterSerialPortOptions.value = [] } }
-  handleSearch()
-}
+
 async function fetchList() {
   loading.value = true
   try {
     const res: any = await deviceApi.list({ page: page.value, pageSize: pageSize.value,
-      keyword: searchKeyword.value || undefined, collectorId: filterCollectorId.value || undefined,
+      keyword: searchKeyword.value || undefined,
+      collectorId: collectorInfo.value?.id || undefined,
       serialPortId: filterSerialPortId.value || undefined, modelId: filterModelId.value || undefined,
       status: filterStatus.value || undefined })
     tableData.value = res.data?.records ?? []; total.value = res.data?.total ?? 0
@@ -187,15 +313,19 @@ function onModelChange(val: number | null) {
 }
 async function openDialog(row?: any) {
   isEdit.value = !!row
-  try { const res: any = await collectorApi.list({ page: 1, pageSize: 999 }); dialogCollectorOptions.value = res.data?.records ?? [] } catch { dialogCollectorOptions.value = [] }
+  if (collectorInfo.value) {
+    dialogCollectorOptions.value = [collectorInfo.value]
+    form.collectorId = collectorInfo.value.id
+    try { const res = await collectorApi.getSerialPorts(collectorInfo.value.id); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] }
+  }
   try { const res: any = await deviceModelApi.list({ page: 1, pageSize: 999 }); dialogModelOptions.value = res.data?.records ?? [] } catch { dialogModelOptions.value = [] }
   if (row) {
     form.id = row.id; form.code = row.code; form.name = row.name
-    form.collectorId = row.collectorId ?? null; form.serialPortId = row.serialPortId ?? null
+    form.collectorId = row.collectorId ?? (collectorInfo.value?.id ?? null); form.serialPortId = row.serialPortId ?? null
     form.deviceModelId = row.modelId ?? null; form.protocolId = row.protocolId ?? null
     form.slaveAddr = row.slaveAddr ?? 1; form.collectInterval = row.collectIntervalSec ?? ''
     if (row.protocolId) { displayProtocolName.value = row.protocolName ?? row.protocol_name ?? ''; dialogProtocolOptions.value = [{ id: row.protocolId, name: displayProtocolName.value }] }
-    if (row.collectorId) { try { const res: any = await collectorApi.getSerialPorts(row.collectorId); dialogSerialPortOptions.value = res.data ?? [] } catch { dialogSerialPortOptions.value = [] } }
+    if (row.collectorId) { try { const res: any = await collectorApi.getSerialPorts(row.collectorId); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] } }
   }
   dialogVisible.value = true
 }
@@ -225,7 +355,7 @@ async function handleDisable(row: any) {
   await ElMessageBox.confirm('确定' + label + '该设备吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
   await deviceApi.updateStatus(row.id, targetStatus); ElMessage.success(label + '成功'); fetchList()
 }
-onMounted(() => { fetchCollectorOptions(); fetchModelOptions(); fetchList() })
+onMounted(() => { loadCollectorAndPorts(); fetchModelOptions(); fetchList() })
 </script>
 
 <style scoped>
@@ -240,4 +370,17 @@ onMounted(() => { fetchCollectorOptions(); fetchModelOptions(); fetchList() })
 .inline-status.offline { background: var(--color-gray-100); color: var(--color-gray-500); }
 .inline-status.alarm { background: var(--color-danger-50); color: var(--color-danger-600); }
 .inline-status.disabled { background: var(--color-warning-50); color: var(--color-warning-600); }
+
+.collector-panel { margin-bottom: var(--space-4); background: var(--surface-primary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); }
+.collector-panel :deep(.el-collapse-item__header) { padding: 0 var(--space-4); height: 48px; font-size: var(--text-sm); }
+.collector-panel :deep(.el-collapse-item__content) { padding: 0 var(--space-4) var(--space-4); }
+.panel-title-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; }
+.panel-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.panel-dot.online { background: var(--color-success-500); }
+.panel-dot.offline { background: var(--color-gray-400); }
+.panel-sub { font-size: 12px; color: var(--color-gray-400); font-weight: var(--font-weight-normal); }
+.panel-meta { font-size: 12px; color: var(--color-gray-400); margin-left: auto; font-weight: var(--font-weight-normal); }
+.collector-config { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); align-items: center; }
+.config-row { display: flex; align-items: center; gap: var(--space-3); }
+.config-label { font-size: 13px; font-weight: var(--font-weight-medium); color: var(--color-gray-600); }
 </style>

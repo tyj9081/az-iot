@@ -24,7 +24,7 @@ public class AuthService {
      */
     public Map<String, String> login(String username, String password) {
         SysUser user = userMapper.selectByUsername(username);
-        if (user == null || !"1".equals(user.getStatus())) {
+        if (user == null || user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(401, "用户名或密码错误");
         }
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {

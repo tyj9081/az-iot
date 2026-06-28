@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "app.mqtt.enabled", havingValue = "true", matchIfMissing = true)
 public class MqttSubscriberService {
 
     @Value("${app.mqtt.broker-url:tcp://localhost:1883}")

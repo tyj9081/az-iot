@@ -18,7 +18,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
     }
 
     public Page<SysUser> page(int page, int pageSize, String keyword) {
-        return baseMapper.selectPageByCondition(new Page<>(page, pageSize), keyword, keyword, null);
+        return baseMapper.selectPageByCondition(new Page<>(page, pageSize), keyword, null);
     }
 
     @Transactional
@@ -33,7 +33,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
     public void updateStatus(Long userId, String status) {
         SysUser user = new SysUser();
         user.setId(userId);
-        user.setStatus(status);
+        user.setStatus(Integer.parseInt(status));
         updateById(user);
     }
 }

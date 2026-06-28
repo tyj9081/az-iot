@@ -25,9 +25,4 @@
         WHERE code = #{code} AND is_deleted = 0
     </select>
 
-    <select id="countByManufacturerId" resultType="long">
-        SELECT COUNT(*) FROM dev_device_model
-        WHERE manufacturer_id = #{manufacturerId}
-    </select>
-
 </mapper>

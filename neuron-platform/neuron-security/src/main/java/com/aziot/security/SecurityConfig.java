@@ -1,13 +1,16 @@
 package com.aziot.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -32,7 +35,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/mqtt/auth").permitAll()
+                // 公开只读接口: 前端下拉框等无需登录的场景
+                .requestMatchers(HttpMethod.GET, "/api/v1/protocols").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/manufacturers").permitAll()
                 .anyRequest().authenticated()
+            )
+            // 未认证时返回 401 而非 403，前端据此跳转登录页
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(authenticationEntryPoint())
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -61,5 +71,20 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * 未认证请求返回 401（而非 Spring Security 默认的 403），
+     * 前端据此区分"未登录"和"无权限"。
+     */
+    @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, authException) -> {
+            response.setContentType("application/json;charset=UTF-8");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write(
+                "{\"code\":401,\"message\":\"请先登录\",\"data\":null,\"timestamp\":" + System.currentTimeMillis() + "}"
+            );
+        };
     }
 }

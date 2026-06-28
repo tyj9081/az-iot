@@ -2,7 +2,6 @@ package com.aziot.dao.mapper.device;
 
 import com.aziot.dao.entity.device.DevDeviceModel;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -11,7 +10,7 @@ import org.apache.ibatis.annotations.Param;
 public interface DevDeviceModelMapper extends BaseMapper<DevDeviceModel> {
 
     /** 分页条件查询型号 */
-    IPage<DevDeviceModel> selectPageByCondition(
+    Page<DevDeviceModel> selectPageByCondition(
         Page<DevDeviceModel> page,
         @Param("manufacturerId") Long manufacturerId,
         @Param("protocolId") Long protocolId,
@@ -26,4 +25,7 @@ public interface DevDeviceModelMapper extends BaseMapper<DevDeviceModel> {
 
     /** 统计指定型号下的设备数 */
     long countByModelId(@Param("modelId") Long modelId);
+
+    /** 统计指定制造商下的型号数 */
+    long countByManufacturerId(@Param("manufacturerId") Long manufacturerId);
 }

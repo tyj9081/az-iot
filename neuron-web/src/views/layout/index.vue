@@ -32,25 +32,17 @@
       <!-- 侧栏导航 -->
       <aside class="app-sidebar">
         <nav class="sidebar-nav">
-          <router-link to="/dashboard" class="nav-item" active-class="active">
-            <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
-              <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-            <span>工作台</span>
-          </router-link>
-
           <div class="nav-group">
-            <div class="nav-group-label">设备模板</div>
+            <div class="nav-group-label">设备接入</div>
             <router-link to="/manufacturer" class="nav-item nav-item--child" active-class="active">
+              <span class="nav-step-badge">1</span>
               <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
                 <path d="M3 7l7-4 7 4v8l-7 4-7-4V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
               </svg>
               <span>品牌管理</span>
             </router-link>
             <router-link to="/device-model" class="nav-item nav-item--child" active-class="active">
+              <span class="nav-step-badge">2</span>
               <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
                 <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
                 <line x1="7" y1="4" x2="7" y2="16" stroke="currentColor" stroke-width="1.5"/>
@@ -58,27 +50,30 @@
               </svg>
               <span>型号管理</span>
             </router-link>
+            <router-link to="/device" class="nav-item nav-item--child" active-class="active">
+              <span class="nav-step-badge">3</span>
+              <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
+                <rect x="4" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="10" cy="11" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 18v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span>设备管理</span>
+            </router-link>
           </div>
 
-          <router-link to="/collector" class="nav-item" active-class="active">
-            <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
-              <rect x="2" y="3" width="16" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="4" y="8" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="13" y="8" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="4" y="14" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="13" y="14" width="3" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-            <span>采集器管理</span>
-          </router-link>
-
-          <router-link to="/device" class="nav-item" active-class="active">
-            <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
-              <rect x="4" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="10" cy="11" r="2" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 18v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <span>设备管理</span>
-          </router-link>
+          <div class="nav-group">
+            <div class="nav-group-label">运行监控</div>
+            <router-link to="/dashboard" class="nav-item nav-item--child" active-class="active">
+              <span class="nav-step-badge">4</span>
+              <svg viewBox="0 0 20 20" fill="none" class="nav-icon">
+                <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              <span>工作台</span>
+            </router-link>
+          </div>
         </nav>
 
         <div class="sidebar-footer">
@@ -268,6 +263,26 @@ const logout = () => {
 
 .nav-item--child {
   padding-left: 24px;
+}
+
+.nav-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-400);
+  background: var(--color-gray-100);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.nav-item.active .nav-step-badge {
+  color: #fff;
+  background: var(--color-brand-500);
 }
 
 .nav-icon {

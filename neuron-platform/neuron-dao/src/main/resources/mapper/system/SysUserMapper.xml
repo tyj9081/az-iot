@@ -23,18 +23,16 @@
     </select>
 
     <!-- ════════════════════════════════════════════ -->
-    <!-- 分页查询: 支持用户名/状态/昵称模糊筛选      -->
+    <!-- 分页查询: 支持用户名/昵称 OR 模糊筛选        -->
     <!-- ════════════════════════════════════════════ -->
     <select id="selectPageByCondition" resultType="com.aziot.dao.entity.system.SysUser">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_user
         <where>
             is_deleted = 0
-            <if test="username != null and username != ''">
-                AND username LIKE CONCAT('%', #{username}, '%')
-            </if>
-            <if test="nickname != null and nickname != ''">
-                AND nickname LIKE CONCAT('%', #{nickname}, '%')
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%')
+                 OR nickname LIKE CONCAT('%', #{keyword}, '%'))
             </if>
             <if test="status != null">
                 AND status = #{status}

@@ -1,0 +1,8 @@
+[
+  {"sensorCode":"humidity","sensorName":"湿度","registerAddress":0,"registerCount":1,"dataType":"uint16","byteOrder":"ABCD","funcCode":"0x04","coefficient":0.1,"offsetVal":0,"unit":"%RH","rw":"R","sortOrder":0,"description":"无符号整型，÷10得实际湿度值"},
+  {"sensorCode":"dew_point","sensorName":"露点温度","registerAddress":1,"registerCount":1,"dataType":"int16","byteOrder":"ABCD","funcCode":"0x04","coefficient":0.1,"offsetVal":0,"unit":"℃","rw":"R","sortOrder":1,"description":"有符号整型，bit15=符号位，÷10得实际露点值"},
+  {"sensorCode":"temp_offset","sensorName":"温度偏移量","registerAddress":3,"registerCount":1,"dataType":"uint16","byteOrder":"ABCD","funcCode":"0x03","coefficient":0.1,"offsetVal":0,"unit":"℃","rw":"RW","sortOrder":2,"description":"0~100范围，默认50(无偏移)，-5.0℃~+5.0℃校准值"},
+  {"sensorCode":"humidity_offset","sensorName":"湿度偏移量","registerAddress":4,"registerCount":1,"dataType":"uint16","byteOrder":"ABCD","funcCode":"0x03","coefficient":0.1,"offsetVal":0,"unit":"%RH","rw":"RW","sortOrder":3,"description":"1~199范围，默认100(无偏移)，-9.9%~+9.9%RH校准值"},
+  {"sensorCode":"baud_rate","sensorName":"波特率","registerAddress":5,"registerCount":1,"dataType":"uint16","byteOrder":"ABCD","funcCode":"0x06","coefficient":1.0,"offsetVal":0,"unit":"bps","rw":"W","sortOrder":4,"description":"0:1200,1:2400,2:4800,3:9600,4:19200"},
+  {"sensorCode":"dev_addr","sensorName":"设备地址","registerAddress":6,"registerCount":1,"dataType":"uint16","byteOrder":"ABCD","funcCode":"0x06","coefficient":1.0,"offsetVal":0,"unit":"","rw":"W","sortOrder":5,"description":"1~255，默认1"}
+]
