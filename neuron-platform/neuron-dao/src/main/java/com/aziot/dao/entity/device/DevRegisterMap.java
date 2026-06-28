@@ -45,6 +45,9 @@ public class DevRegisterMap {
 
     private String description;
 
+    /** 协议特定参数(JSON) — MQTT topic/json_path, OPC UA node_id, SNMP OID, HTTP url/method 等 */
+    private String extraParams;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

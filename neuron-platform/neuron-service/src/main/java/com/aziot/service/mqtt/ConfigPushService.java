@@ -79,6 +79,10 @@ public class ConfigPushService {
                 dp.put("coefficient", rm.getCoefficient() == null ? 1 : rm.getCoefficient());
                 dp.put("offset", rm.getOffsetVal() == null ? 0 : rm.getOffsetVal());
                 dp.put("unit", rm.getUnit() == null ? "" : rm.getUnit());
+                if (rm.getExtraParams() != null && !rm.getExtraParams().isBlank()) {
+                    try { dp.put("extra_params", objectMapper.readTree(rm.getExtraParams())); }
+                    catch (Exception ignored) { dp.put("extra_params", rm.getExtraParams()); }
+                }
                 dps.add(dp);
             }
             deviceNode.put("data_points", dps);

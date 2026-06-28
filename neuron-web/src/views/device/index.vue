@@ -73,7 +73,7 @@
             <el-option v-for="c in dialogCollectorOptions" :key="c.id" :label="c.name + ' (' + c.code + ')'" :value="c.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="串口" prop="serialPortId">
+        <el-form-item label="串口" prop="serialPortId" v-if="selectedProtocolBusType === 'serial'">
           <el-select v-model="form.serialPortId" placeholder="选择串口" :disabled="!form.collectorId" style="width:100%">
             <el-option v-for="p in dialogSerialPortOptions" :key="p.id" :label="p.portName" :value="p.id" />
           </el-select>
@@ -88,8 +88,11 @@
             <el-option v-for="p in dialogProtocolOptions" :key="p.id" :label="p.name" :value="p.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="从站地址" prop="slaveAddr">
+        <el-form-item label="从站地址" prop="slaveAddr" v-if="selectedProtocolBusType === 'serial'">
           <el-input-number v-model="form.slaveAddr" :min="1" :max="255" style="width:100%" />
+        </el-form-item>
+        <el-form-item v-if="selectedProtocolBusType === 'tcp'" label="连接方式">
+          <el-tag type="info">TCP / IP 连接，使用采集器 IP 地址</el-tag>
         </el-form-item>
         <el-form-item label="采集间隔(秒)" prop="collectInterval">
           <el-input v-model="form.collectInterval" placeholder="留空继承型号默认值" style="width:100%" />
@@ -147,6 +150,7 @@ const rules: FormRules = {
 
 const dialogCollectorOptions = ref<any[]>([]); const dialogSerialPortOptions = ref<any[]>([])
 const dialogModelOptions = ref<any[]>([]); const dialogProtocolOptions = ref<any[]>([]); const displayProtocolName = ref('')
+const selectedProtocolBusType = ref('serial') // serial / tcp, 选型号后自动判断
 
 function statusLabel(status: string): string {
   const map: Record<string, string> = { online: '在线', offline: '离线', alarm: '告警', disabled: '已禁用' }
@@ -182,11 +186,23 @@ async function onDialogCollectorChange(val: number | null) {
   if (val) { try { const res: any = await collectorApi.getSerialPorts(val); dialogSerialPortOptions.value = (res.data ?? []).filter((p: any) => p.portType === 'device') } catch { dialogSerialPortOptions.value = [] } }
 }
 function onModelChange(val: number | null) {
-  form.protocolId = null; displayProtocolName.value = ''
+  form.protocolId = null; displayProtocolName.value = ''; selectedProtocolBusType.value = 'serial'
   if (val) {
     const model = dialogModelOptions.value.find((m: any) => m.id === val)
-    if (model) { form.protocolId = model.protocol_id ?? model.protocolId ?? null; displayProtocolName.value = model.protocol_name ?? model.protocolName ?? ''; dialogProtocolOptions.value = [{ id: form.protocolId, name: displayProtocolName.value }] }
+    if (model) {
+      form.protocolId = model.protocol_id ?? model.protocolId ?? null
+      displayProtocolName.value = model.protocol_name ?? model.protocolName ?? ''
+      dialogProtocolOptions.value = [{ id: form.protocolId, name: displayProtocolName.value }]
+      selectedProtocolBusType.value = getProtocolBusType(displayProtocolName.value)
+    }
   }
+}
+
+/** 根据协议名判断总线类型 */
+function getProtocolBusType(name: string): string {
+  const tcpProtocols = ['MODBUS_TCP', 'IEC_60870_5_104', 'DNP3', 'OPC_UA', 'BACNET_IP', 'S7_COMM',
+    'FINS_TCP', 'ETHERNET_IP', 'MITSUBISHI_MC', 'MQTT', 'SNMP_V2C', 'HTTP_JSON']
+  return tcpProtocols.includes(name.toUpperCase()) ? 'tcp' : 'serial'
 }
 async function openDialog(row?: any) {
   isEdit.value = !!row
@@ -209,14 +225,17 @@ async function openDialog(row?: any) {
 function resetForm() {
   formRef.value?.resetFields(); form.id = null; form.code = ''; form.name = ''
   form.collectorId = null; form.serialPortId = null; form.deviceModelId = null; form.protocolId = null
-  form.slaveAddr = 1; form.collectInterval = ''; dialogSerialPortOptions.value = []; dialogProtocolOptions.value = []; displayProtocolName.value = ''
+  form.slaveAddr = 1; form.collectInterval = ''; dialogSerialPortOptions.value = []; dialogProtocolOptions.value = []; displayProtocolName.value = ''; selectedProtocolBusType.value = 'serial'
 }
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   submitLoading.value = true
   try {
-    const payload = { code: form.code, name: form.name, serialPortId: form.serialPortId, modelId: form.deviceModelId, slaveAddr: form.slaveAddr, collectIntervalSec: form.collectInterval ? Number(form.collectInterval) : undefined }
+    const payload: any = { code: form.code, name: form.name, modelId: form.deviceModelId, slaveAddr: form.slaveAddr, collectIntervalSec: form.collectInterval ? Number(form.collectInterval) : undefined }
+    if (selectedProtocolBusType.value === 'serial') {
+      payload.serialPortId = form.serialPortId
+    }
     if (isEdit.value && form.id) { await deviceApi.update(form.id, payload); ElMessage.success('更新成功') }
     else { await deviceApi.create(payload); ElMessage.success('创建设备成功，已触发MQTT下发') }
     dialogVisible.value = false; fetchList()

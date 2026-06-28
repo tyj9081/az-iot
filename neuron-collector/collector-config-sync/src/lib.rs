@@ -33,6 +33,7 @@ async fn run_once(collector: Collector, mqtt: MqttUploadConfig) -> anyhow::Resul
         match eventloop.poll().await? {
             Event::Incoming(Packet::Publish(packet)) => {
                 let payload = String::from_utf8_lossy(&packet.payload);
+                tracing::info!("Config delta received, len={}B", payload.len());
                 match serde_json::from_str::<ConfigDelta>(&payload) {
                     Ok(delta) => apply_delta(&collector, delta).await,
                     Err(err) => tracing::warn!("Invalid config delta: {err}; payload={payload}"),
@@ -49,8 +50,15 @@ async fn apply_delta(collector: &Collector, delta: ConfigDelta) {
         "add" | "update" => {
             if let Some(device) = delta.device {
                 let id = device.id;
+                let name = device.name.clone();
+                let code = device.code.clone();
+                let protocol = device.protocol.display_name();
+                let dp_count = device.data_points.len();
                 registry.register(device);
-                tracing::info!("Applied config delta action={} device_id={}", delta.action, id);
+                tracing::info!(
+                    "Device registered: id={} code={} name={} protocol={} data_points={}",
+                    id, code, name, protocol, dp_count
+                );
             } else {
                 tracing::warn!("Config delta action={} missing device", delta.action);
             }

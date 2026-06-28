@@ -1,7 +1,7 @@
 # AZ-IOT 数据库设计文档
 
 > 数据库名: `neuron_db` | 引擎: MySQL (InnoDB) | 字符集: `utf8mb4_unicode_ci`
-> 迁移工具: Flyway | 最后更新: 2026-06-27
+> ~~迁移工具: Flyway~~ | 最后更新: 2026-06-28
 
 ---
 
@@ -306,6 +306,8 @@
 | rw | VARCHAR(8) | NOT NULL | 'R' | R=只读 W=只写 RW=读写 |
 | sort_order | INT | NOT NULL | 0 | 排序号 |
 | description | VARCHAR(256) | | NULL | 说明 |
+| extra_params | JSON | | NULL | 协议特定参数(MQTT topic/OPC UA node_id/SNMP OID等, V17) |
+| extra_params | JSON | | NULL | 协议特定参数(MQTT topic/OPC UA node_id等, V17) |
 | created_at | DATETIME | NOT NULL | NOW() | |
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
 
@@ -328,7 +330,7 @@
 | mqtt_client_id | VARCHAR(64) | UNIQUE NOT NULL | | MQTT Client ID |
 | ip_address | VARCHAR(45) | | NULL | 采集器IP |
 | collect_interval_sec | INT | NOT NULL | 900 | 采集间隔(秒) (V14迁入) |
-| status | TINYINT | NOT NULL | 0 | 0=离线 1=在线 2=告警 |
+| **status (V18 变更)** ⚠️ | VARCHAR(16) | NOT NULL | 'offline' | offline / online / alarm |
 | firmware_version | VARCHAR(32) | | NULL | 固件版本 |
 | last_heartbeat | DATETIME | | NULL | 最后心跳时间 |
 | description | VARCHAR(512) | | NULL | 描述 |
@@ -342,6 +344,7 @@
 | updated_at | DATETIME | NOT NULL | NOW() ON UPDATE | |
 
 > ⚠️ V14 之前 `collect_interval_sec` 可能存在旧版本未执行迁移的风险。
+> ⚠️ **V18 迁移**: `status` 字段从 `TINYINT(0/1/2)` 改为 `VARCHAR(16) (offline/online/alarm)`，与 `dev_device.status` 对齐。
 
 ---
 
@@ -563,6 +566,7 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | ADR-06 | sys_user_role / sys_role_permission 无外键 | 中间表未创建显式 FK，减少锁竞争 |
 | ADR-07 | dev_collector MQTT 认证分离 | V11 为每个采集器独立存储 MQTT 凭证，支持 TLS |
 | ADR-08 | 协议编码与 Rust 枚举编译期对齐 | dev_protocol.code 在 V16 中与采集端 ProtocolType 严格一致 |
+| ADR-09 | TCP 协议使用 extra_params JSON | dev_register_map 新增加 extra_params 字段，支持 MQTT topic/node_id、OPC UA node_id、SNMP OID 等协议差异化参数 |
 
 ---
 
@@ -579,5 +583,7 @@ PARTITION BY RANGE (TO_DAYS(read_at)) (
 | 2026-06-25 | V14 | 采集间隔从型号移至采集器 |
 | 2026-06-26 | V15 | 设备指令表 |
 | 2026-06-27 | V16 | 设备状态改为 VARCHAR + 协议编码对齐 |
+| 2026-06-28 | V17 | register_map 增加 extra_params JSON 列 (TCP 协议支持) |
+| 2026-06-28 | V18 | collector.status TINYINT → VARCHAR (与 device 对齐) |
 
-> **V12 已跳过**，不存在对应的迁移文件。
+> **V12 已跳过**，V17~V18 为 2026-06-28 新增。

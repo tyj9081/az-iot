@@ -147,6 +147,8 @@ pub struct DataPoint {
     pub coefficient: f64,
     pub offset: f64,
     pub unit: String,
+    #[serde(default)]
+    pub extra_params: Option<serde_json::Value>,  // TCP 协议扩展参数: MQTT topic/json_path, OPC UA node_id 等
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
