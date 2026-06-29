@@ -38,7 +38,7 @@ impl ProtocolDriver for S7CommDriver {
         // S7 SETUP COMMUNICATION
         let setup = s7_build_setup_comm();
         stream.write_all(&setup).context("S7 setup")?;
-        let n = stream.read(&mut buf).context("S7 setup ack")?;
+        let _n = stream.read(&mut buf).context("S7 setup ack")?;
 
         // Read data for each data point
         let mut readings = HashMap::new();
@@ -50,7 +50,7 @@ impl ProtocolDriver for S7CommDriver {
                 "Q" | "q" => 0x82,
                 _ => 0x84, // default to DB
             };
-            let db_num = if area == 0x84 { (pt.register_address >> 16) as u16 } else { 0u16 };
+            let db_num = if area == 0x84 { (pt.register_address as u32 >> 16) as u16 } else { 0u16 };
             let byte_offset = (pt.register_address & 0xFFFF) as u16;
 
             let read_cmd = s7_build_read_var(area, db_num, byte_offset, 4);
