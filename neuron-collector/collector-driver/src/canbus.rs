@@ -6,7 +6,6 @@ use anyhow::{Context, Result};
 use collector_model::{BusType, Device};
 use std::collections::HashMap;
 use std::io::Read;
-use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
 use super::ProtocolDriver;
@@ -20,6 +19,7 @@ impl ProtocolDriver for CanBusDriver {
 
     #[cfg(target_os = "linux")]
     fn collect(&self, device: &Device) -> Result<HashMap<String, f64>> {
+        use std::os::unix::io::AsRawFd;
         let iface = match &device.bus {
             BusType::Serial { port_name, .. } => port_name.clone(),
             _ => anyhow::bail!("CAN driver requires network interface name (e.g. can0)"),
