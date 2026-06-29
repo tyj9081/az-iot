@@ -5,6 +5,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fix cross-platform imports
+        shell: pwsh
+        run: |
+          # Remove Linux-only use std::os::unix::io::AsRawFd from canbus.rs (causes Windows build failure)
+          $file = "neuron-collector/collector-driver/src/canbus.rs"
+          (Get-Content $file) -replace '        use std::os::unix::io::AsRawFd;', '' | Set-Content $file
+          Write-Host "Fixed canbus.rs for Windows build"
       - name: Remove stale cargo config
         shell: pwsh
         run: |
