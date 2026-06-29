@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use collector_model::{BusType, Device};
 use std::collections::HashMap;
 use std::io::Read;
+use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
 use super::ProtocolDriver;
@@ -26,7 +27,24 @@ impl ProtocolDriver for CanBusDriver {
 
         let socket = open_can_socket(&iface)?;
         let mut can_socket = socket;
-        can_socket.set_read_timeout(Some(Duration::from_secs(5)))?;
+        // Use setsockopt SO_RCVTIMEO instead of set_read_timeout on File
+        let timeout = libc::timeval {
+            tv_sec: 5,
+            tv_usec: 0,
+        };
+        let fd = can_socket.as_raw_fd();
+        let ret = unsafe {
+            libc::setsockopt(
+                fd,
+                libc::SOL_SOCKET,
+                libc::SO_RCVTIMEO,
+                &timeout as *const _ as *const libc::c_void,
+                std::mem::size_of::<libc::timeval>() as u32,
+            )
+        };
+        if ret < 0 {
+            anyhow::bail!("Failed to set CAN socket timeout");
+        }
 
         let mut readings = HashMap::new();
         let mut frame_buf = [0u8; 16];
