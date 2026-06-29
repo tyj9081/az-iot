@@ -31,51 +31,70 @@ async fn mb_collect_async(
 
         let raw: Vec<u16> = match fc {
             1 | 2 => {
-                let result = ctx.read_coils(addr, count).await
-                    .with_context(|| format!("Read coils at {addr}"));
+                let result = tokio::time::timeout(
+                    Duration::from_secs(1),
+                    ctx.read_coils(addr, count),
+                ).await;
                 match result {
-                    Ok(Ok(coils)) => {
+                    Err(_elapsed) => {
+                        tracing::warn!(
+                            "Modbus coils timeout fc={} addr={} — skipped",
+                            fc, addr
+                        );
+                        continue;
+                    }
+                    Ok(Ok(Ok(coils))) => {
                         tracing::debug!(
                             "Modbus coils read OK: addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
                     }
-                    Ok(Err(exception)) => {
+                    Ok(Ok(Err(exception))) => {
                         tracing::warn!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
                         );
                         continue;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         tracing::warn!(
                             "Modbus read error fc={} addr={} count={}: {:#} — skipped",
                             fc, addr, count, e
                         );
                         continue;
                     }
+                    _ => continue,
                 }
             }
             3 | 4 => {
-                let result = ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"));
+                let result = tokio::time::timeout(
+                    Duration::from_secs(1),
+                    ctx.read_holding_registers(addr, count),
+                ).await;
                 match result {
-                    Ok(Ok(data)) => {
+                    Err(_elapsed) => {
+                        tracing::warn!(
+                            "Modbus read timeout fc={} addr={} count={} — skipped",
+                            fc, addr, count
+                        );
+                        continue;
+                    }
+                    Ok(Ok(Ok(data))) => {
                         tracing::debug!(
                             "Modbus registers read OK: addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         data
                     }
-                    Ok(Err(exception)) => {
+                    Ok(Ok(Err(exception))) => {
                         tracing::warn!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
                         );
                         continue;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         tracing::warn!(
                             "Modbus read error fc={} addr={} count={}: {:#} — skipped",
                             fc, addr, count, e
@@ -85,30 +104,40 @@ async fn mb_collect_async(
                 }
             }
             _ => {
-                let result = ctx.read_holding_registers(addr, count).await
-                    .with_context(|| format!("Read registers at {addr}"));
+                let result = tokio::time::timeout(
+                    Duration::from_secs(1),
+                    ctx.read_holding_registers(addr, count),
+                ).await;
                 match result {
-                    Ok(Ok(data)) => {
+                    Err(_elapsed) => {
+                        tracing::warn!(
+                            "Modbus read timeout fc={} addr={} count={} — skipped (default fc)",
+                            fc, addr, count
+                        );
+                        continue;
+                    }
+                    Ok(Ok(Ok(data))) => {
                         tracing::debug!(
                             "Modbus registers read OK (default fc): addr={} count={} elapsed={}ms",
                             addr, count, read_start.elapsed().as_millis()
                         );
                         data
                     }
-                    Ok(Err(exception)) => {
+                    Ok(Ok(Err(exception))) => {
                         tracing::warn!(
                             "Modbus exception fc=0x{:02X} addr={} count={}: {:?} — skipped",
                             fc, addr, count, exception
                         );
                         continue;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         tracing::warn!(
                             "Modbus read error fc={} addr={} count={}: {:#} — skipped",
                             fc, addr, count, e
                         );
                         continue;
                     }
+                    _ => continue,
                 }
             }
         };
