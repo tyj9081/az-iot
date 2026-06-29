@@ -1,0 +1,29 @@
+name: Build Linux Collector
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove stale cargo config
+        run: |
+          rm -f neuron-collector/.cargo/config.toml
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --target x86_64-unknown-linux-gnu
+          rustup default stable
+      - name: Build
+        run: |
+          cd neuron-collector
+          cargo build --release -p collector-bin --target x86_64-unknown-linux-gnu
+      - name: Package
+        run: |
+          mkdir -p release
+          find neuron-collector/target -name "collector-bin" -type f | head -1 | xargs -I{} cp {} release/
+          if [ -f "neuron-collector/config.toml" ]; then cp neuron-collector/config.toml release/; fi
+          tar -czf neuron-collector-linux.tar.gz release/
+          echo "Package created: neuron-collector-linux.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: neuron-collector-linux
+          path: neuron-collector-linux.tar.gz
